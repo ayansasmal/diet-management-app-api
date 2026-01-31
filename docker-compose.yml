@@ -1,0 +1,25 @@
+# Docker Compose for Diet Management App
+# Provides PostgreSQL database for local development
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: diet-app-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: dietapp
+      POSTGRES_PASSWORD: localdev
+      POSTGRES_DB: diet_management
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dietapp -d diet_management"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
+    name: diet-app-pgdata

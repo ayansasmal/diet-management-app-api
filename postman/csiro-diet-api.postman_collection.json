@@ -1,0 +1,982 @@
+{
+  "info": {
+    "name": "CSIRO Low-Carb Diet API",
+    "description": "API collection for MVP-0: Google OAuth Authentication, Profile, Weight/Glucose Tracking",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "googleCredential",
+      "value": "",
+      "type": "string",
+      "description": "Google ID token from Sign In with Google - paste here after signing in"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has status ok', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.status).to.eql('ok');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "health"]
+            }
+          }
+        },
+        {
+          "name": "Liveness Probe",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has status ok', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.status || jsonData.data?.status).to.eql('ok');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/health/live",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "health", "live"]
+            }
+          }
+        },
+        {
+          "name": "Readiness Probe",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has status ok', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.status).to.eql('ok');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/health/ready",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "health", "ready"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth (Google OAuth)",
+      "description": "Google OAuth authentication flow. To test:\n1. Get a Google ID token from Sign In with Google on the frontend\n2. Set the 'googleCredential' collection variable with the token\n3. Run 'Google Login' request",
+      "item": [
+        {
+          "name": "Google Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has accessToken', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.accessToken).to.be.a('string');",
+                  "    pm.collectionVariables.set('accessToken', jsonData.data.accessToken);",
+                  "});",
+                  "",
+                  "pm.test('Token type is Bearer', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.tokenType).to.eql('Bearer');",
+                  "});",
+                  "",
+                  "pm.test('Response has user object with role', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.user).to.be.an('object');",
+                  "    pm.expect(jsonData.data.user.email).to.be.a('string');",
+                  "    pm.expect(jsonData.data.user.role).to.be.oneOf(['user', 'admin']);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"credential\": \"{{googleCredential}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/google",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "google"]
+            },
+            "description": "Authenticate with Google ID token.\n\nTo get a Google ID token:\n1. Use Sign In with Google on your frontend\n2. The callback returns a 'credential' (ID token)\n3. Paste it in the 'googleCredential' collection variable"
+          }
+        },
+        {
+          "name": "Google Login - Invalid Token (Should Fail)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 401 Unauthorized', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});",
+                  "",
+                  "pm.test('Response has error message', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.error.message).to.include('Invalid');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"credential\": \"invalid-token\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/google",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "google"]
+            }
+          }
+        },
+        {
+          "name": "Get Current User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has user data', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.id).to.be.a('string');",
+                  "    pm.expect(jsonData.data.email).to.be.a('string');",
+                  "    pm.expect(jsonData.data.role).to.be.oneOf(['user', 'admin']);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "me"]
+            }
+          }
+        },
+        {
+          "name": "Get Current User Without Token (Should Fail)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 401 Unauthorized', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "me"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Create Profile",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Response has profile data', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.heightCm).to.eql(175);",
+                  "    pm.expect(jsonData.data.weightKg).to.eql(85);",
+                  "});",
+                  "",
+                  "pm.test('BMR and BMI are calculated', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.bmr).to.be.a('number');",
+                  "    pm.expect(jsonData.data.bmi).to.be.a('number');",
+                  "    pm.expect(jsonData.data.dailyCalorieTarget).to.be.a('number');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"heightCm\": 175,\n  \"weightKg\": 85,\n  \"age\": 35,\n  \"sex\": \"male\",\n  \"activityLevel\": \"moderately_active\",\n  \"targetWeightKg\": 75\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/users/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "profile"]
+            }
+          }
+        },
+        {
+          "name": "Get Profile",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has profile data', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.heightCm).to.be.a('number');",
+                  "    pm.expect(jsonData.data.weightKg).to.be.a('number');",
+                  "    pm.expect(jsonData.data.bmr).to.be.a('number');",
+                  "    pm.expect(jsonData.data.bmi).to.be.a('number');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "profile"]
+            }
+          }
+        },
+        {
+          "name": "Update Profile",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Weight is updated', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.weightKg).to.eql(83);",
+                  "});",
+                  "",
+                  "pm.test('BMR and BMI are recalculated', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.bmr).to.be.a('number');",
+                  "    pm.expect(jsonData.data.bmi).to.be.a('number');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"weightKg\": 83\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/users/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "profile"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Weight Tracking",
+      "item": [
+        {
+          "name": "Log Weight Today",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const today = new Date().toISOString().split('T')[0];",
+                  "pm.collectionVariables.set('today', today);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Response has weight data', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.weightKg).to.eql(82.5);",
+                  "    pm.expect(jsonData.data.id).to.be.a('string');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"logDate\": \"{{today}}\",\n  \"weightKg\": 82.5\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/tracking/weight",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tracking", "weight"]
+            }
+          }
+        },
+        {
+          "name": "Get Weight History",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has logs array', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.logs).to.be.an('array');",
+                  "});",
+                  "",
+                  "pm.test('Has at least one weight entry', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.logs.length).to.be.at.least(1);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/tracking/weight",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tracking", "weight"]
+            }
+          }
+        },
+        {
+          "name": "Get Today's Weight",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const today = new Date().toISOString().split('T')[0];",
+                  "pm.collectionVariables.set('today', today);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has weight data', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.weightKg).to.be.a('number');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/tracking/weight/{{today}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tracking", "weight", "{{today}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Weight (Log Same Date)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const today = new Date().toISOString().split('T')[0];",
+                  "pm.collectionVariables.set('today', today);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 or 201', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "",
+                  "pm.test('Weight is updated', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.weightKg).to.eql(82.3);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"logDate\": \"{{today}}\",\n  \"weightKg\": 82.3\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/tracking/weight",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tracking", "weight"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Glucose Tracking",
+      "item": [
+        {
+          "name": "Log Fasting Glucose",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const today = new Date().toISOString().split('T')[0];",
+                  "pm.collectionVariables.set('today', today);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Response has glucose data', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.glucoseMmolL).to.eql(5.2);",
+                  "    pm.expect(jsonData.data.readingType).to.eql('fasting');",
+                  "    pm.collectionVariables.set('glucoseId', jsonData.data.id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"logDate\": \"{{today}}\",\n  \"readingTime\": \"{{$isoTimestamp}}\",\n  \"glucoseMmolL\": 5.2,\n  \"readingType\": \"fasting\",\n  \"notes\": \"Morning reading before breakfast\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/tracking/glucose",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tracking", "glucose"]
+            }
+          }
+        },
+        {
+          "name": "Log Post-Meal Glucose",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const today = new Date().toISOString().split('T')[0];",
+                  "pm.collectionVariables.set('today', today);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Response has glucose data', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.glucoseMmolL).to.eql(7.1);",
+                  "    pm.expect(jsonData.data.readingType).to.eql('post_meal');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"logDate\": \"{{today}}\",\n  \"readingTime\": \"{{$isoTimestamp}}\",\n  \"glucoseMmolL\": 7.1,\n  \"readingType\": \"post_meal\",\n  \"notes\": \"2 hours after lunch\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/tracking/glucose",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tracking", "glucose"]
+            }
+          }
+        },
+        {
+          "name": "Get Glucose History",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has logs array', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.logs).to.be.an('array');",
+                  "});",
+                  "",
+                  "pm.test('Has at least two glucose entries', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.logs.length).to.be.at.least(2);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/tracking/glucose",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tracking", "glucose"]
+            }
+          }
+        },
+        {
+          "name": "Get Today's Glucose",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const today = new Date().toISOString().split('T')[0];",
+                  "pm.collectionVariables.set('today', today);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response is array', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/tracking/glucose/{{today}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tracking", "glucose", "{{today}}"]
+            }
+          }
+        },
+        {
+          "name": "Delete Glucose Entry",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 or 204', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 204]);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/tracking/glucose/{{glucoseId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tracking", "glucose", "{{glucoseId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Validation Tests",
+      "item": [
+        {
+          "name": "Google Login - Empty Credential",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 400 Bad Request', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Response has validation error', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.eql(false);",
+                  "    pm.expect(jsonData.error).to.be.an('object');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"credential\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/google",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "google"]
+            }
+          }
+        },
+        {
+          "name": "Create Profile Invalid Age",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 400 Bad Request', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Response has validation error', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.eql(false);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"heightCm\": 175,\n  \"weightKg\": 85,\n  \"age\": 5,\n  \"sex\": \"male\",\n  \"activityLevel\": \"moderately_active\",\n  \"targetWeightKg\": 75\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/users/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "profile"]
+            }
+          }
+        },
+        {
+          "name": "Log Invalid Glucose Reading",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 400 Bad Request', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Response has validation error', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.eql(false);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"glucoseMmolL\": 50,\n  \"readingType\": \"fasting\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/tracking/glucose",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tracking", "glucose"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

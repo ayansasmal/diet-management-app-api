@@ -1,0 +1,399 @@
+// Diet Management App - Database Schema
+// PostgreSQL for development and production
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// User account for authentication via Google OAuth
+model User {
+  id           String        @id @default(cuid())
+  email        String        @unique
+  googleId     String        @unique @map("google_id")
+  name         String?
+  picture      String?       // Google profile picture URL
+  role         String        @default("user") // "user" or "admin"
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+
+  profile      UserProfile?
+  weightLogs   WeightLog[]
+  glucoseLogs  GlucoseLog[]
+  mealLogs     MealLog[]
+  createdPlans NutritionPlan[] @relation("CreatedPlans")
+  planAssignments UserPlanAssignment[]
+
+  // Dietician-Client relationships (Privacy-first B2B)
+  dieticianClients  DieticianClient[] @relation("DieticianToClients")  // As dietician: my clients
+  clientDieticians  DieticianClient[] @relation("ClientToDieticians")  // As client: my dieticians
+  assignedPlans     UserPlanAssignment[] @relation("AssignedByDietician") // Plans I assigned to others
+
+  @@map("users")
+}
+
+/// User profile with health metrics and diet configuration
+model UserProfile {
+  userId              String   @id @map("user_id")
+  heightCm            Float    @map("height_cm")
+  weightKg            Float    @map("weight_kg")
+  age                 Int
+  sex                 String   // 'male' or 'female'
+  activityLevel       String   @map("activity_level") // sedentary, lightly_active, moderately_active, very_active, extremely_active
+  targetWeightKg      Float    @map("target_weight_kg")
+  dietLevel           Int      @map("diet_level") // 1, 2, or 3 based on CSIRO diet
+  bmr                 Float    // Basal Metabolic Rate
+  bmi                 Float    // Body Mass Index
+  targetBmi           Float    @map("target_bmi")
+  dailyCalorieTarget  Float    @map("daily_calorie_target")
+  estimatedWeeksToTarget Int?  @map("estimated_weeks_to_target")
+  themePreference     String   @map("theme_preference") @default("system") // 'light', 'dark', or 'system'
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_profiles")
+}
+
+/// Daily weight log - one entry per day per user
+model WeightLog {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  logDate   DateTime @map("log_date")
+  weightKg  Float    @map("weight_kg")
+  loggedAt  DateTime @default(now()) @map("logged_at")
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, logDate])
+  @@index([userId, logDate(sort: Desc)])
+  @@map("weight_logs")
+}
+
+/// Glucose readings - multiple entries per day allowed
+model GlucoseLog {
+  id           String   @id @default(cuid())
+  userId       String   @map("user_id")
+  logDate      DateTime @map("log_date")
+  readingTime  DateTime @map("reading_time")
+  glucoseMmolL Float    @map("glucose_mmol_l")
+  readingType  String   @map("reading_type") // fasting, post_meal, random
+  notes        String?
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, logDate(sort: Desc)])
+  @@map("glucose_logs")
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Nutrition Plan Engine - MVP-1+
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/// Nutrition Plan - configurable diet plan with rules and targets
+/// Complex config (dailyTargets, mealFlow, rules) stored as JSON for flexibility
+model NutritionPlan {
+  id                String    @id @default(cuid())
+  name              String
+  shortDescription  String    @map("short_description")
+  longDescription   String?   @map("long_description")
+  visibility        String    @default("system") // system, public, private
+  createdById       String?   @map("created_by_id")
+  difficulty        String    @default("intermediate") // beginner, intermediate, advanced
+  tags              String    @default("[]") // JSON array of tags
+  sourceAttribution String?   @map("source_attribution")
+  version           String    @default("1.0.0")
+  isPremium         Boolean   @default(false) @map("is_premium")
+  icon              String?
+  accentColor       String?   @map("accent_color")
+
+  // Complex configuration stored as JSON
+  dailyTargets      String    @map("daily_targets") // JSON: MacroTargets
+  mealFlow          String    @map("meal_flow")     // JSON: MealFlowConfig
+  rules             String    @default("[]")        // JSON: NutritionRule[]
+
+  // Plan behavior flags
+  useNetCarbs       Boolean   @default(false) @map("use_net_carbs")
+  defaultServingMultiplier Float @default(1) @map("default_serving_multiplier")
+  tips              String?   // JSON: string[]
+
+  // Flexible extensions - for anything dieticians want to add
+  // Examples: supplements, cooking guidelines, client context, weekly limits, etc.
+  extensions        String?   // JSON: Record<string, unknown> - completely optional, freeform
+
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  createdBy         User?     @relation("CreatedPlans", fields: [createdById], references: [id], onDelete: SetNull)
+  assignments       UserPlanAssignment[]
+
+  @@index([visibility])
+  @@index([isPremium])
+  @@index([createdById])
+  @@map("nutrition_plans")
+}
+
+/// User's active plan assignment with optional customizations
+model UserPlanAssignment {
+  id              String    @id @default(cuid())
+  userId          String    @map("user_id")
+  planId          String    @map("plan_id")
+
+  // User customizations (stored as JSON, null = use plan defaults)
+  customTargets   String?   @map("custom_targets")  // JSON: Partial<MacroTargets>
+  disabledRules   String?   @map("disabled_rules")  // JSON: string[]
+
+  startedAt       DateTime  @default(now()) @map("started_at")
+  targetDate      DateTime? @map("target_date")
+  notes           String?
+  isActive        Boolean   @default(true) @map("is_active")
+
+  // Flexible extensions - for progress tracking, weekly reviews, checkpoints, etc.
+  extensions      String?   // JSON: Record<string, unknown> - completely optional
+
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan            NutritionPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  // Privacy & Attribution
+  assignedById    String?   @map("assigned_by_id")  // Dietician who assigned this plan (null = self-assigned)
+  sharedWith      String?   @map("shared_with")     // JSON: string[] - Dietician IDs who can view this assignment
+
+  assignedBy      User?     @relation("AssignedByDietician", fields: [assignedById], references: [id], onDelete: SetNull)
+
+  @@unique([userId, planId])
+  @@index([userId, isActive])
+  @@index([assignedById])
+  @@map("user_plan_assignments")
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Dietician-Client Relationships - Privacy-First B2B
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/// Explicit relationship between dietician and client.
+/// Privacy: Dieticians can ONLY see clients in this table.
+/// No implicit access - everything must be explicitly granted.
+model DieticianClient {
+  id            String    @id @default(cuid())
+  dieticianId   String    @map("dietician_id")
+  clientId      String    @map("client_id")
+
+  // Relationship status
+  status        String    @default("active") // active, paused, ended
+  startedAt     DateTime  @default(now()) @map("started_at")
+  endedAt       DateTime? @map("ended_at")
+
+  // Dietician's private notes (client cannot see)
+  privateNotes  String?   @map("private_notes")
+
+  // Client-controlled permissions
+  canViewHistory    Boolean @default(false) @map("can_view_history")  // Can dietician see plans from before relationship?
+  canViewWeight     Boolean @default(true) @map("can_view_weight")    // Can dietician see weight logs?
+  canViewGlucose    Boolean @default(true) @map("can_view_glucose")   // Can dietician see glucose logs?
+
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  dietician     User      @relation("DieticianToClients", fields: [dieticianId], references: [id], onDelete: Cascade)
+  client        User      @relation("ClientToDieticians", fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([dieticianId, clientId])
+  @@index([dieticianId, status])
+  @@index([clientId, status])
+  @@map("dietician_clients")
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Food Database - MVP-1
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/// Food category for grouping and unit-based portion tracking.
+/// Categories: protein, carbs, vegetables, fat, dairy, fruit, condiments, beverages
+model FoodCategory {
+  id              String    @id @default(cuid())
+  name            String    @unique  // "Protein", "Carbohydrates", etc.
+  slug            String    @unique  // "protein", "carbs", etc.
+  description     String?
+  icon            String?   // Emoji or icon name
+  color           String?   // Hex color for UI
+  sortOrder       Int       @default(0) @map("sort_order")
+
+  // Unit definition for this category (e.g., "1 protein unit = 7g protein")
+  unitName        String?   @map("unit_name")        // "protein unit", "carb serve"
+  unitDescription String?   @map("unit_description") // "Approximately 7g of protein"
+
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  foods           FoodItem[]
+
+  @@map("food_categories")
+}
+
+/// Individual food item with full nutrition data.
+/// Supports both system-defined and user-created foods.
+model FoodItem {
+  id              String    @id @default(cuid())
+  name            String
+  brandName       String?   @map("brand_name")
+  description     String?
+  categoryId      String    @map("category_id")
+
+  // Creator (null = system food, populated = user-created)
+  createdById     String?   @map("created_by_id")
+  isVerified      Boolean   @default(false) @map("is_verified")  // Admin-verified data
+  isPublic        Boolean   @default(true) @map("is_public")     // Visible to other users
+
+  // Tags for filtering (JSON array)
+  tags            String    @default("[]")  // ["low-carb", "vegetarian", "gluten-free"]
+
+  // Search optimization
+  searchTerms     String?   @map("search_terms")  // Comma-separated terms for FTS
+
+  // Images (S3 URLs or similar)
+  imageUrl            String?   @map("image_url")              // Photo of the food
+  nutritionLabelUrl   String?   @map("nutrition_label_url")    // Photo of nutrition label
+
+  // Barcode for scanning (future)
+  barcode         String?   @unique
+
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  category        FoodCategory @relation(fields: [categoryId], references: [id])
+  servings        FoodServing[]
+  mealFoodItems   MealFoodItem[]
+
+  @@index([categoryId])
+  @@index([name])
+  @@index([isPublic, isVerified])
+  @@index([barcode])
+  @@map("food_items")
+}
+
+/// Serving size options for a food with nutrition per serving.
+/// Multiple servings per food (e.g., 100g, 1 cup, 1 unit).
+model FoodServing {
+  id              String    @id @default(cuid())
+  foodId          String    @map("food_id")
+
+  // Serving identification
+  servingName     String    @map("serving_name")     // "100g", "1 cup", "1 medium", "1 unit"
+  servingSize     Float     @map("serving_size")     // 100, 240, 120
+  servingUnit     String    @map("serving_unit")     // "g", "ml", "piece"
+  isDefault       Boolean   @default(false) @map("is_default")  // Default serving for this food
+  isUnitServing   Boolean   @default(false) @map("is_unit_serving")  // Is this the "1 unit" serving?
+
+  // Macronutrients (per serving)
+  calories        Float     // kcal
+  protein         Float     // grams
+  carbs           Float     // grams (total carbohydrates)
+  fat             Float     // grams
+
+  // Extended nutrition (optional, per serving)
+  fiber           Float?    // grams (for net carbs calculation)
+  sugar           Float?    // grams
+  saturatedFat    Float?    @map("saturated_fat")   // grams
+  sodium          Float?    // mg
+  cholesterol     Float?    // mg
+  potassium       Float?    // mg
+
+  // Glycemic data (optional)
+  glycemicIndex   Int?      @map("glycemic_index")  // 0-100
+  glycemicLoad    Float?    @map("glycemic_load")
+
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  food            FoodItem  @relation(fields: [foodId], references: [id], onDelete: Cascade)
+
+  @@index([foodId])
+  @@index([isDefault])
+  @@map("food_servings")
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Meal Logging - MVP-1
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/// Individual meal log entry (breakfast, lunch, dinner, snack).
+/// Contains pre-calculated totals for fast dashboard reads.
+model MealLog {
+  id              String    @id @default(cuid())
+  userId          String    @map("user_id")
+  mealDate        DateTime  @map("meal_date")       // Date of the meal (YYYY-MM-DD)
+  mealType        String    @map("meal_type")       // breakfast, lunch, dinner, snack
+  mealTime        DateTime? @map("meal_time")       // Optional specific time
+
+  // Pre-calculated totals (derived from food items for fast reads)
+  totalCalories   Float     @default(0) @map("total_calories")
+  totalProtein    Float     @default(0) @map("total_protein")
+  totalCarbs      Float     @default(0) @map("total_carbs")
+  totalFat        Float     @default(0) @map("total_fat")
+  totalFiber      Float     @default(0) @map("total_fiber")
+
+  // User experience data (MVP-2 ready)
+  photoUrl        String?   @map("photo_url")       // S3 URL for meal photo
+  rating          Int?                              // 1-5 user rating
+  notes           String?                           // User notes about the meal
+
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  foodItems       MealFoodItem[]
+
+  @@index([userId, mealDate(sort: Desc)])
+  @@index([userId, mealType])
+  @@map("meal_logs")
+}
+
+/// Individual food item within a meal log.
+/// Captures the nutrition values at logging time (snapshot).
+model MealFoodItem {
+  id              String    @id @default(cuid())
+  mealId          String    @map("meal_id")
+
+  // Food reference (nullable in case food is deleted)
+  foodId          String?   @map("food_id")
+  servingId       String?   @map("serving_id")
+
+  // Snapshot data - captured at logging time for historical accuracy
+  foodName        String    @map("food_name")       // Name at time of logging
+  servingName     String    @map("serving_name")    // Serving description
+  quantity        Float     @default(1)             // Number of servings (e.g., 1.5)
+
+  // Calculated nutrition (serving values × quantity)
+  calories        Float
+  protein         Float
+  carbs           Float
+  fat             Float
+  fiber           Float     @default(0)
+
+  // User can add custom foods inline (unverified)
+  isCustomEntry   Boolean   @default(false) @map("is_custom_entry")
+
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  meal            MealLog   @relation(fields: [mealId], references: [id], onDelete: Cascade)
+  food            FoodItem? @relation(fields: [foodId], references: [id], onDelete: SetNull)
+
+  @@index([mealId])
+  @@index([foodId])
+  @@map("meal_food_items")
+}

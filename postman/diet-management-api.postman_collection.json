@@ -1,0 +1,2428 @@
+{
+  "info": {
+    "name": "Diet Management API",
+    "description": "Comprehensive API collection for Diet Management App.\n\nCovers all modules:\n- Health: Liveness/readiness probes\n- Auth: Google OAuth authentication\n- Users: Profile management with BMR/BMI\n- Calculator: Health metrics calculation\n- Tracking: Weight and glucose logging\n- Plans: Nutrition plan management\n- Foods: Food database with categories and servings\n- Meals: Meal logging and daily summaries\n\nVersion: 1.0.0\nLast Updated: January 2026",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "secret"
+    },
+    {
+      "key": "googleCredential",
+      "value": "",
+      "type": "secret",
+      "description": "Google ID token from Sign In with Google"
+    },
+    {
+      "key": "today",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "testPlanId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "testFoodId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "testServingId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "testMealId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "testMealItemId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "glucoseId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "createdPlanId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "createdFoodId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Health",
+      "description": "Health check endpoints for monitoring and Kubernetes probes",
+      "item": [
+        {
+          "name": "Health Check",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has status ok', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.status).to.eql('ok');",
+                  "});",
+                  "",
+                  "pm.test('Response time is acceptable', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(500);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "health"]
+            }
+          }
+        },
+        {
+          "name": "Liveness Probe",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has status ok', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.status || jsonData.data?.status).to.eql('ok');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/health/live",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "health", "live"]
+            }
+          }
+        },
+        {
+          "name": "Readiness Probe",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has status ok', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.status).to.eql('ok');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/health/ready",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "health", "ready"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Authentication",
+      "description": "Google OAuth authentication flow.\n\nTo test:\n1. Get a Google ID token from Sign In with Google on the frontend\n2. Set the 'googleCredential' collection variable\n3. Run 'Google Login' request",
+      "item": [
+        {
+          "name": "Google Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has accessToken', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.accessToken).to.be.a('string');",
+                  "    pm.collectionVariables.set('accessToken', jsonData.data.accessToken);",
+                  "});",
+                  "",
+                  "pm.test('Token type is Bearer', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.tokenType).to.eql('Bearer');",
+                  "});",
+                  "",
+                  "pm.test('Response has user object with role', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.user).to.be.an('object');",
+                  "    pm.expect(jsonData.data.user.email).to.be.a('string');",
+                  "    pm.expect(jsonData.data.user.role).to.be.oneOf(['user', 'admin']);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"credential\": \"{{googleCredential}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/google",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "google"]
+            }
+          }
+        },
+        {
+          "name": "Get Current User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has user data', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.id).to.be.a('string');",
+                  "    pm.expect(jsonData.data.email).to.be.a('string');",
+                  "    pm.expect(jsonData.data.role).to.be.oneOf(['user', 'admin']);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "me"]
+            }
+          }
+        },
+        {
+          "name": "[Error] Invalid Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 401 Unauthorized', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});",
+                  "",
+                  "pm.test('Response has error message', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.error || jsonData.message).to.exist;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"credential\": \"invalid-token\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/google",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "google"]
+            }
+          }
+        },
+        {
+          "name": "[Error] No Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 401 Unauthorized', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "me"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. User Profile",
+      "description": "User profile management with BMR/BMI calculations",
+      "item": [
+        {
+          "name": "Create Profile",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Response has profile data', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.heightCm).to.eql(175);",
+                  "    pm.expect(jsonData.data.weightKg).to.eql(85);",
+                  "});",
+                  "",
+                  "pm.test('BMR and BMI are calculated', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.bmr).to.be.a('number');",
+                  "    pm.expect(jsonData.data.bmi).to.be.a('number');",
+                  "    pm.expect(jsonData.data.dailyCalorieTarget).to.be.a('number');",
+                  "});",
+                  "",
+                  "pm.test('BMI is in valid range', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.bmi).to.be.within(10, 60);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"heightCm\": 175,\n  \"weightKg\": 85,\n  \"age\": 35,\n  \"sex\": \"male\",\n  \"activityLevel\": \"moderately_active\",\n  \"targetWeightKg\": 75\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/users/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "profile"]
+            }
+          }
+        },
+        {
+          "name": "Get Profile",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has profile data', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.heightCm).to.be.a('number');",
+                  "    pm.expect(jsonData.data.weightKg).to.be.a('number');",
+                  "    pm.expect(jsonData.data.bmr).to.be.a('number');",
+                  "    pm.expect(jsonData.data.bmi).to.be.a('number');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "profile"]
+            }
+          }
+        },
+        {
+          "name": "Update Profile",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Weight is updated', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.weightKg).to.eql(83);",
+                  "});",
+                  "",
+                  "pm.test('BMR and BMI are recalculated', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.bmr).to.be.a('number');",
+                  "    pm.expect(jsonData.data.bmi).to.be.a('number');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"weightKg\": 83\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/users/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "profile"]
+            }
+          }
+        },
+        {
+          "name": "[Error] Invalid Age",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 400 Bad Request', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Response has validation error', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.eql(false);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"heightCm\": 175,\n  \"weightKg\": 85,\n  \"age\": 5,\n  \"sex\": \"male\",\n  \"activityLevel\": \"moderately_active\",\n  \"targetWeightKg\": 75\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/users/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "profile"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Calculator",
+      "description": "Health metrics calculation endpoints",
+      "item": [
+        {
+          "name": "Get Health Metrics",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has BMR', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.bmr).to.be.a('number');",
+                  "    pm.expect(jsonData.bmr).to.be.above(1000);",
+                  "});",
+                  "",
+                  "pm.test('Response has BMI', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.bmi).to.be.a('number');",
+                  "    pm.expect(jsonData.bmi).to.be.within(10, 60);",
+                  "});",
+                  "",
+                  "pm.test('Response has TDEE', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.tdee).to.be.a('number');",
+                  "    pm.expect(jsonData.tdee).to.be.above(jsonData.bmr);",
+                  "});",
+                  "",
+                  "pm.test('Response has diet level', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.dietLevel).to.be.a('number');",
+                  "    pm.expect(jsonData.dietLevel).to.be.oneOf([1, 2, 3]);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/calculator/metrics",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "calculator", "metrics"]
+            }
+          }
+        },
+        {
+          "name": "[Error] No Profile",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Note: This test expects 404 for users without a profile",
+                  "pm.test('Status code is 404 or 200', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 404) {",
+                  "    pm.test('Error message indicates profile needed', function () {",
+                  "        const jsonData = pm.response.json();",
+                  "        pm.expect(jsonData.message || jsonData.error?.message).to.include('profile');",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/calculator/metrics",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "calculator", "metrics"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Weight Tracking",
+      "description": "Daily weight logging with upsert behavior",
+      "item": [
+        {
+          "name": "Log Weight Today",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const today = new Date().toISOString().split('T')[0];",
+                  "pm.collectionVariables.set('today', today);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 or 201', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "",
+                  "pm.test('Response has weight data', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.weightKg).to.eql(82.5);",
+                  "    pm.expect(jsonData.data.id).to.be.a('string');",
+                  "});",
+                  "",
+                  "pm.test('Response has logDate', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.logDate).to.include(pm.collectionVariables.get('today'));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"weightKg\": 82.5\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/tracking/weight",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tracking", "weight"]
+            }
+          }
+        },
+        {
+          "name": "Get Weight History",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has logs array', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.logs).to.be.an('array');",
+                  "});",
+                  "",
+                  "pm.test('Has at least one weight entry', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.logs.length).to.be.at.least(1);",
+                  "});",
+                  "",
+                  "pm.test('Each log has required fields', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    if (jsonData.data.logs.length > 0) {",
+                  "        const log = jsonData.data.logs[0];",
+                  "        pm.expect(log).to.have.property('id');",
+                  "        pm.expect(log).to.have.property('weightKg');",
+                  "        pm.expect(log).to.have.property('logDate');",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/tracking/weight",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tracking", "weight"]
+            }
+          }
+        },
+        {
+          "name": "Get Today's Weight",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const today = new Date().toISOString().split('T')[0];",
+                  "pm.collectionVariables.set('today', today);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has weight data', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.weightKg).to.be.a('number');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/tracking/weight/today",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tracking", "weight", "today"]
+            }
+          }
+        },
+        {
+          "name": "Get Weight by Date",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const today = new Date().toISOString().split('T')[0];",
+                  "pm.collectionVariables.set('today', today);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 or 404', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    pm.test('Response has weight data', function () {",
+                  "        const jsonData = pm.response.json();",
+                  "        pm.expect(jsonData.data.weightKg).to.be.a('number');",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/tracking/weight/{{today}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tracking", "weight", "{{today}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Weight (Upsert)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const today = new Date().toISOString().split('T')[0];",
+                  "pm.collectionVariables.set('today', today);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 or 201', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "",
+                  "pm.test('Weight is updated', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.weightKg).to.eql(82.3);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"logDate\": \"{{today}}\",\n  \"weightKg\": 82.3\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/tracking/weight",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tracking", "weight"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Glucose Tracking",
+      "description": "Blood glucose logging with multiple readings per day",
+      "item": [
+        {
+          "name": "Log Fasting Glucose",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const today = new Date().toISOString().split('T')[0];",
+                  "pm.collectionVariables.set('today', today);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Response has glucose data', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.glucoseMmolL).to.eql(5.2);",
+                  "    pm.expect(jsonData.data.readingType).to.eql('fasting');",
+                  "    pm.collectionVariables.set('glucoseId', jsonData.data.id);",
+                  "});",
+                  "",
+                  "pm.test('Reading category is normal', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    // Fasting 5.2 mmol/L is normal (< 5.6)",
+                  "    pm.expect(jsonData.data.category).to.eql('normal');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"glucoseMmolL\": 5.2,\n  \"readingType\": \"fasting\",\n  \"notes\": \"Morning reading before breakfast\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/tracking/glucose",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tracking", "glucose"]
+            }
+          }
+        },
+        {
+          "name": "Log Post-Meal Glucose",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const today = new Date().toISOString().split('T')[0];",
+                  "pm.collectionVariables.set('today', today);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Response has glucose data', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.glucoseMmolL).to.eql(7.1);",
+                  "    pm.expect(jsonData.data.readingType).to.eql('post_meal');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"glucoseMmolL\": 7.1,\n  \"readingType\": \"post_meal\",\n  \"notes\": \"2 hours after lunch\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/tracking/glucose",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tracking", "glucose"]
+            }
+          }
+        },
+        {
+          "name": "Get Glucose History",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has logs array', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.logs).to.be.an('array');",
+                  "});",
+                  "",
+                  "pm.test('Each log has required fields', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    if (jsonData.data.logs.length > 0) {",
+                  "        const log = jsonData.data.logs[0];",
+                  "        pm.expect(log).to.have.property('id');",
+                  "        pm.expect(log).to.have.property('glucoseMmolL');",
+                  "        pm.expect(log).to.have.property('readingType');",
+                  "        pm.expect(log).to.have.property('category');",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/tracking/glucose",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tracking", "glucose"]
+            }
+          }
+        },
+        {
+          "name": "Get Today's Glucose",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response is array', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/tracking/glucose/today",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tracking", "glucose", "today"]
+            }
+          }
+        },
+        {
+          "name": "Delete Glucose Entry",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 or 204', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 204]);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/tracking/glucose/{{glucoseId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tracking", "glucose", "{{glucoseId}}"]
+            }
+          }
+        },
+        {
+          "name": "[Error] Invalid Glucose Value",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 400 Bad Request', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Response has validation error', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.eql(false);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"glucoseMmolL\": 50,\n  \"readingType\": \"fasting\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/tracking/glucose",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tracking", "glucose"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Nutrition Plans",
+      "description": "Nutrition plan management and user assignments",
+      "item": [
+        {
+          "name": "List Plans",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response is array of plans', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.be.an('array');",
+                  "});",
+                  "",
+                  "pm.test('Plans have required fields', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    if (jsonData.length > 0) {",
+                  "        const plan = jsonData[0];",
+                  "        pm.expect(plan).to.have.property('id');",
+                  "        pm.expect(plan).to.have.property('name');",
+                  "        pm.expect(plan).to.have.property('visibility');",
+                  "        pm.collectionVariables.set('testPlanId', plan.id);",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/plans",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "plans"]
+            }
+          }
+        },
+        {
+          "name": "List Plans (Filter by Difficulty)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('All plans match difficulty filter', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    jsonData.forEach(function(plan) {",
+                  "        pm.expect(plan.difficulty).to.eql('beginner');",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/plans?difficulty=beginner",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "plans"],
+              "query": [
+                {
+                  "key": "difficulty",
+                  "value": "beginner"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Plan Details",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Plan has complete details', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('id');",
+                  "    pm.expect(jsonData).to.have.property('name');",
+                  "    pm.expect(jsonData).to.have.property('description');",
+                  "    pm.expect(jsonData).to.have.property('dailyTargets');",
+                  "    pm.expect(jsonData).to.have.property('mealFlow');",
+                  "    pm.expect(jsonData).to.have.property('rules');",
+                  "});",
+                  "",
+                  "pm.test('Daily targets have macro values', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    const targets = jsonData.dailyTargets;",
+                  "    pm.expect(targets).to.have.property('calories');",
+                  "    pm.expect(targets).to.have.property('protein');",
+                  "    pm.expect(targets).to.have.property('carbs');",
+                  "    pm.expect(targets).to.have.property('fat');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/plans/{{testPlanId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "plans", "{{testPlanId}}"]
+            }
+          }
+        },
+        {
+          "name": "Create Custom Plan",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Plan created with correct data', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.name).to.eql('My Custom Plan');",
+                  "    pm.expect(jsonData.visibility).to.eql('private');",
+                  "    pm.collectionVariables.set('createdPlanId', jsonData.id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"My Custom Plan\",\n  \"description\": \"A personalized low-carb plan\",\n  \"visibility\": \"private\",\n  \"difficulty\": \"intermediate\",\n  \"dailyTargets\": {\n    \"calories\": { \"min\": 1500, \"max\": 1800 },\n    \"protein\": { \"min\": 100, \"max\": 150 },\n    \"carbs\": { \"max\": 50 },\n    \"fat\": { \"min\": 80, \"max\": 120 },\n    \"fiber\": { \"min\": 25 }\n  },\n  \"mealFlow\": {\n    \"slots\": [\n      { \"id\": \"breakfast\", \"label\": \"Breakfast\", \"optional\": false },\n      { \"id\": \"lunch\", \"label\": \"Lunch\", \"optional\": false },\n      { \"id\": \"dinner\", \"label\": \"Dinner\", \"optional\": false }\n    ],\n    \"defaultSequence\": [\"breakfast\", \"lunch\", \"dinner\"]\n  },\n  \"rules\": [],\n  \"tags\": [\"low-carb\", \"custom\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/plans",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "plans"]
+            }
+          }
+        },
+        {
+          "name": "Assign Plan to User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Assignment created', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('id');",
+                  "    pm.expect(jsonData.planId).to.eql(pm.collectionVariables.get('testPlanId'));",
+                  "    pm.expect(jsonData.isActive).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"planId\": \"{{testPlanId}}\",\n  \"startDate\": \"{{today}}\",\n  \"notes\": \"Starting my diet journey\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/users/plan",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "plan"]
+            }
+          }
+        },
+        {
+          "name": "Get Active Plan",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Has active assignment or null', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    if (jsonData) {",
+                  "        pm.expect(jsonData.isActive).to.be.true;",
+                  "        pm.expect(jsonData).to.have.property('plan');",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/plan",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "plan"]
+            }
+          }
+        },
+        {
+          "name": "Get Plan History",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response is array', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/plan/history",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "plan", "history"]
+            }
+          }
+        },
+        {
+          "name": "Deactivate Plan",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 204', function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/plan",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "plan"]
+            }
+          }
+        },
+        {
+          "name": "Delete Custom Plan",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 204', function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/plans/{{createdPlanId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "plans", "{{createdPlanId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Food Database",
+      "description": "Food items, categories, and serving sizes",
+      "item": [
+        {
+          "name": "List Categories",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response is array of categories', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.be.an('array');",
+                  "});",
+                  "",
+                  "pm.test('Categories have required fields', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    if (jsonData.length > 0) {",
+                  "        const cat = jsonData[0];",
+                  "        pm.expect(cat).to.have.property('id');",
+                  "        pm.expect(cat).to.have.property('name');",
+                  "        pm.expect(cat).to.have.property('slug');",
+                  "        pm.collectionVariables.set('testCategoryId', cat.id);",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/foods/categories",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "foods", "categories"]
+            }
+          }
+        },
+        {
+          "name": "List Categories (with counts)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Categories include food counts', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    if (jsonData.length > 0) {",
+                  "        pm.expect(jsonData[0]).to.have.property('foodCount');",
+                  "        pm.expect(jsonData[0].foodCount).to.be.a('number');",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/foods/categories?includeCounts=true",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "foods", "categories"],
+              "query": [
+                {
+                  "key": "includeCounts",
+                  "value": "true"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Search Foods",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has items and pagination', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('items');",
+                  "    pm.expect(jsonData).to.have.property('pagination');",
+                  "    pm.expect(jsonData.items).to.be.an('array');",
+                  "});",
+                  "",
+                  "pm.test('Save first food ID for later tests', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    if (jsonData.items.length > 0) {",
+                  "        pm.collectionVariables.set('testFoodId', jsonData.items[0].id);",
+                  "        if (jsonData.items[0].servings && jsonData.items[0].servings.length > 0) {",
+                  "            pm.collectionVariables.set('testServingId', jsonData.items[0].servings[0].id);",
+                  "        }",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/foods",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "foods"]
+            }
+          }
+        },
+        {
+          "name": "Search Foods by Query",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has search results', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.items).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/foods?q=chicken",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "foods"],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "chicken"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Search Foods by Category",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('All results match category filter', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    jsonData.items.forEach(function(food) {",
+                  "        pm.expect(food.category.slug).to.eql('protein');",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/foods?category=protein",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "foods"],
+              "query": [
+                {
+                  "key": "category",
+                  "value": "protein"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Food by ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Food has complete details', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('id');",
+                  "    pm.expect(jsonData).to.have.property('name');",
+                  "    pm.expect(jsonData).to.have.property('category');",
+                  "    pm.expect(jsonData).to.have.property('servings');",
+                  "});",
+                  "",
+                  "pm.test('Food has nutrition data', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('caloriesPer100g');",
+                  "    pm.expect(jsonData).to.have.property('proteinPer100g');",
+                  "    pm.expect(jsonData).to.have.property('carbsPer100g');",
+                  "    pm.expect(jsonData).to.have.property('fatPer100g');",
+                  "});",
+                  "",
+                  "pm.test('Food has at least one serving', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.servings).to.be.an('array');",
+                  "    pm.expect(jsonData.servings.length).to.be.at.least(1);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/foods/{{testFoodId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "foods", "{{testFoodId}}"]
+            }
+          }
+        },
+        {
+          "name": "Create Custom Food",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Food created with correct data', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.name).to.eql('My Custom Protein Bar');",
+                  "    pm.expect(jsonData.isVerified).to.be.false;",
+                  "    pm.collectionVariables.set('createdFoodId', jsonData.id);",
+                  "});",
+                  "",
+                  "pm.test('Food has servings', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.servings).to.be.an('array');",
+                  "    pm.expect(jsonData.servings.length).to.be.at.least(1);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"My Custom Protein Bar\",\n  \"brand\": \"Homemade\",\n  \"categoryId\": \"{{testCategoryId}}\",\n  \"caloriesPer100g\": 350,\n  \"proteinPer100g\": 25,\n  \"carbsPer100g\": 30,\n  \"fatPer100g\": 15,\n  \"fiberPer100g\": 5,\n  \"isPublic\": false,\n  \"servings\": [\n    {\n      \"name\": \"1 bar\",\n      \"grams\": 50,\n      \"isDefault\": true\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/foods",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "foods"]
+            }
+          }
+        },
+        {
+          "name": "Update Food",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Food name updated', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.name).to.eql('My Updated Protein Bar');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"My Updated Protein Bar\",\n  \"proteinPer100g\": 28\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/foods/{{createdFoodId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "foods", "{{createdFoodId}}"]
+            }
+          }
+        },
+        {
+          "name": "Add Serving to Food",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Food has new serving', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.servings.length).to.be.at.least(2);",
+                  "    const newServing = jsonData.servings.find(s => s.name === 'Half bar');",
+                  "    pm.expect(newServing).to.exist;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Half bar\",\n  \"grams\": 25,\n  \"isDefault\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/foods/{{createdFoodId}}/servings",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "foods", "{{createdFoodId}}", "servings"]
+            }
+          }
+        },
+        {
+          "name": "Delete Food",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 204', function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/foods/{{createdFoodId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "foods", "{{createdFoodId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. Meal Logging",
+      "description": "Meal logging with daily summaries and nutrition tracking",
+      "item": [
+        {
+          "name": "Log a Meal",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const today = new Date().toISOString().split('T')[0];",
+                  "pm.collectionVariables.set('today', today);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Meal created with correct data', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('id');",
+                  "    pm.expect(jsonData.mealType).to.eql('lunch');",
+                  "    pm.collectionVariables.set('testMealId', jsonData.id);",
+                  "});",
+                  "",
+                  "pm.test('Meal has nutrition totals', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('totalCalories');",
+                  "    pm.expect(jsonData).to.have.property('totalProtein');",
+                  "    pm.expect(jsonData).to.have.property('totalCarbs');",
+                  "    pm.expect(jsonData).to.have.property('totalFat');",
+                  "});",
+                  "",
+                  "pm.test('Meal has food items', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.items).to.be.an('array');",
+                  "    pm.expect(jsonData.items.length).to.be.at.least(1);",
+                  "    if (jsonData.items.length > 0) {",
+                  "        pm.collectionVariables.set('testMealItemId', jsonData.items[0].id);",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mealType\": \"lunch\",\n  \"logDate\": \"{{today}}\",\n  \"rating\": 4,\n  \"notes\": \"Healthy lunch!\",\n  \"items\": [\n    {\n      \"foodId\": \"{{testFoodId}}\",\n      \"servingId\": \"{{testServingId}}\",\n      \"quantity\": 1\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/meals",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "meals"]
+            }
+          }
+        },
+        {
+          "name": "Quick Log Meal",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const today = new Date().toISOString().split('T')[0];",
+                  "pm.collectionVariables.set('today', today);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Quick meal created', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('id');",
+                  "    pm.expect(jsonData.mealType).to.eql('snack');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"foodId\": \"{{testFoodId}}\",\n  \"servingId\": \"{{testServingId}}\",\n  \"quantity\": 1,\n  \"mealType\": \"snack\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/meals/quick",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "meals", "quick"]
+            }
+          }
+        },
+        {
+          "name": "Get Meal History",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has meals and pagination', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('meals');",
+                  "    pm.expect(jsonData).to.have.property('pagination');",
+                  "    pm.expect(jsonData.meals).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/meals",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "meals"]
+            }
+          }
+        },
+        {
+          "name": "Get Today's Meals",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has daily summary', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('date');",
+                  "    pm.expect(jsonData).to.have.property('meals');",
+                  "    pm.expect(jsonData).to.have.property('totals');",
+                  "});",
+                  "",
+                  "pm.test('Totals have nutrition data', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.totals).to.have.property('calories');",
+                  "    pm.expect(jsonData.totals).to.have.property('protein');",
+                  "    pm.expect(jsonData.totals).to.have.property('carbs');",
+                  "    pm.expect(jsonData.totals).to.have.property('fat');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/meals/today",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "meals", "today"]
+            }
+          }
+        },
+        {
+          "name": "Get Daily Summary",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const today = new Date().toISOString().split('T')[0];",
+                  "pm.collectionVariables.set('today', today);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has date and totals', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('date');",
+                  "    pm.expect(jsonData).to.have.property('totals');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/meals/summary?date={{today}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "meals", "summary"],
+              "query": [
+                {
+                  "key": "date",
+                  "value": "{{today}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Meal by ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Meal has complete details', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('id');",
+                  "    pm.expect(jsonData).to.have.property('mealType');",
+                  "    pm.expect(jsonData).to.have.property('items');",
+                  "    pm.expect(jsonData).to.have.property('totalCalories');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/meals/{{testMealId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "meals", "{{testMealId}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Meal Metadata",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Meal metadata updated', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.rating).to.eql(5);",
+                  "    pm.expect(jsonData.notes).to.eql('Updated notes - great meal!');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rating\": 5,\n  \"notes\": \"Updated notes - great meal!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/meals/{{testMealId}}/metadata",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "meals", "{{testMealId}}", "metadata"]
+            }
+          }
+        },
+        {
+          "name": "Add Food Item to Meal",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Food item added', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.items.length).to.be.at.least(2);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"foodId\": \"{{testFoodId}}\",\n  \"servingId\": \"{{testServingId}}\",\n  \"quantity\": 0.5\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/meals/{{testMealId}}/items",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "meals", "{{testMealId}}", "items"]
+            }
+          }
+        },
+        {
+          "name": "Remove Food Item from Meal",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Food item removed', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    const removedItem = jsonData.items.find(i => i.id === pm.collectionVariables.get('testMealItemId'));",
+                  "    pm.expect(removedItem).to.be.undefined;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/meals/{{testMealId}}/items/{{testMealItemId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "meals", "{{testMealId}}", "items", "{{testMealItemId}}"]
+            }
+          }
+        },
+        {
+          "name": "Delete Meal",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 204', function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/meals/{{testMealId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "meals", "{{testMealId}}"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
