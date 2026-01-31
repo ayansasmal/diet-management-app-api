@@ -115,10 +115,16 @@ Required:
 - `JWT_SECRET` - Token signing secret
 - `NODE_ENV` - Environment mode
 
-## Related Repositories
+## Documentation
+
+All project documentation is in the `docs/` folder:
+- Architecture diagrams, business requirements, security docs
+- API guides: Google Auth, Postman/Newman testing
+- Delivery plan, nutrition engine design
+
+## Related Repository
 
 - [Frontend UI](https://github.com/ayansasmal/diet-management-app-ui)
-- [Documentation Hub](https://github.com/ayansasmal/low-carb-diet-app)
 
 ## Debugging Tips
 

@@ -115,10 +115,24 @@ src/
     └── health/                 # Health checks
 ```
 
-## Related Repositories
+## Documentation
+
+Architecture and design documentation is available in the `docs/` folder:
+
+| Document | Description |
+|----------|-------------|
+| [Solution Overview](docs/SOLUTION_ON_A_PAGE.md) | Executive summary, project vision |
+| [Architecture](docs/ARCHITECTURE.md) | System design, component diagrams, ERD |
+| [Business Requirements](docs/BUSINESS_REQUIREMENTS.md) | Personas, features, roadmap |
+| [Security](docs/SECURITY_DOCUMENTATION.md) | Security architecture, OWASP |
+| [Nutrition Engine](docs/NUTRITION_PLAN_ENGINE.md) | Plan-agnostic engine design |
+| [Delivery Plan](docs/DELIVERY_PLAN.md) | Implementation roadmap |
+| [Google Auth](docs/GOOGLE_AUTH.md) | OAuth setup guide |
+| [API Testing](docs/POSTMAN_NEWMAN_GUIDE.md) | Postman/Newman testing |
+
+## Related Repository
 
 - [Frontend UI](https://github.com/ayansasmal/diet-management-app-ui) - Next.js frontend
-- [Documentation](https://github.com/ayansasmal/low-carb-diet-app) - Architecture & design docs
 
 ## License
 
