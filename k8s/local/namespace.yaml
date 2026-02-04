@@ -1,0 +1,8 @@
+# Kubernetes namespace for Diet Management App local development
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: diet-app
+  labels:
+    app.kubernetes.io/name: diet-management-app
+    app.kubernetes.io/env: local

@@ -1,0 +1,15 @@
+# Caddyfile.local - Local development without HTTPS
+# Run with: caddy run --config Caddyfile.local
+
+:80 {
+    # Reverse proxy to NestJS application
+    reverse_proxy localhost:3000 {
+        health_uri /api/health/live
+        health_interval 30s
+    }
+
+    # Permissive CORS for local development
+    header Access-Control-Allow-Origin "*"
+    header Access-Control-Allow-Methods "*"
+    header Access-Control-Allow-Headers "*"
+}

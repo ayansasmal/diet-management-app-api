@@ -30,6 +30,19 @@ npm run db:seed                # Seed initial data
 # Testing
 npm run test:api               # Newman API tests
 npm run test:api:report        # Tests with HTML reports
+
+# Deployment (Local K8s)
+./scripts/deploy-local.sh setup   # Full local K8s setup
+./scripts/deploy-local.sh status  # Check deployment status
+./scripts/deploy-local.sh clean   # Tear down local env
+
+# Deployment (AWS via Crossplane)
+./scripts/deploy-aws.sh setup-creds  # Configure AWS credentials
+./scripts/deploy-aws.sh infra        # Provision AWS resources
+./scripts/deploy-aws.sh status       # Check AWS resources
+
+# Docker Image (GitHub Container Registry)
+./scripts/build-push-ghcr.sh all    # Build ARM64 and push to GHCR
 ```
 
 ## Code Patterns
@@ -121,6 +134,32 @@ All project documentation is in the `docs/` folder:
 - Architecture diagrams, business requirements, security docs
 - API guides: Google Auth, Postman/Newman testing
 - Delivery plan, nutrition engine design
+- **AWS Deployment Guide** (`docs/aws-deployment-guide.md`)
+
+## AWS Deployment
+
+Infrastructure managed via **Crossplane** (Kubernetes-native IaC):
+
+| Resource | Spec | Cost |
+|----------|------|------|
+| EC2 | Spot t4g.micro (ARM) | ~$2.50/mo |
+| RDS | db.t4g.micro (ARM) | FREE (Year 1) |
+| S3 | Meal photos bucket | ~$0.12/mo |
+| Route 53 | DNS | ~$1/mo |
+
+```
+k8s/
+├── local/          # Docker Desktop K8s manifests
+│   ├── namespace.yaml
+│   ├── postgres-deployment.yaml
+│   ├── app-deployment.yaml
+│   └── ...
+└── crossplane/     # AWS Crossplane manifests
+    ├── vpc.yaml
+    ├── rds.yaml
+    ├── spot-instance.yaml
+    └── ...
+```
 
 ## Related Repository
 
@@ -132,6 +171,8 @@ All project documentation is in the `docs/` folder:
 2. **400 Bad Request**: Check DTOs for required vs optional fields
 3. **Auth failures**: Verify Google OAuth credentials match environment
 4. **Database connection**: Ensure Docker container is running
+5. **Crossplane resource stuck**: Check `kubectl describe <resource>` for events
+6. **EC2 spot interrupted**: Instance auto-stops; run `aws ec2 start-instances`
 
 ---
 

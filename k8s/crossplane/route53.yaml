@@ -1,0 +1,69 @@
+# Route 53 DNS Configuration for Diet Management App
+# Creates hosted zone and A record pointing to Elastic IP
+#
+# PREREQUISITE: Purchase domain via Route 53 or register existing domain
+# AWS Console → Route 53 → Registered domains → Register Domain
+---
+# Hosted Zone (created automatically when you register domain via Route 53)
+# If using external registrar, create this manually
+# apiVersion: route53.aws.upbound.io/v1beta1
+# kind: Zone
+# metadata:
+#   name: diet-app-zone
+#   labels:
+#     app: diet-management
+# spec:
+#   forProvider:
+#     region: ap-southeast-2
+#     name: yourdomain.com
+#     tags:
+#       Name: diet-app-zone
+#       ManagedBy: crossplane
+#   providerConfigRef:
+#     name: aws-prod
+---
+# A Record pointing to Elastic IP
+# IMPORTANT: Replace 'YOUR_HOSTED_ZONE_ID' and 'YOUR_ELASTIC_IP' before applying
+apiVersion: route53.aws.upbound.io/v1beta1
+kind: Record
+metadata:
+  name: diet-app-api-record
+  labels:
+    app: diet-management
+spec:
+  forProvider:
+    region: ap-southeast-2
+    # Replace with your hosted zone ID (from Route 53 console)
+    zoneId: YOUR_HOSTED_ZONE_ID
+    name: api.yourdomain.com
+    type: A
+    ttl: 300
+    # Replace with your Elastic IP address
+    # Get with: kubectl get eip diet-app-eip -o jsonpath='{.status.atProvider.publicIp}'
+    records:
+      - YOUR_ELASTIC_IP
+  providerConfigRef:
+    name: aws-prod
+---
+# Health Check for the API endpoint
+apiVersion: route53.aws.upbound.io/v1beta1
+kind: HealthCheck
+metadata:
+  name: diet-app-health-check
+  labels:
+    app: diet-management
+spec:
+  forProvider:
+    region: ap-southeast-2
+    # Replace with your domain or IP
+    fqdn: api.yourdomain.com
+    port: 443
+    type: HTTPS
+    resourcePath: /api/health/live
+    requestInterval: 30
+    failureThreshold: 3
+    tags:
+      Name: diet-app-health-check
+      ManagedBy: crossplane
+  providerConfigRef:
+    name: aws-prod

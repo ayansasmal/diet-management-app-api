@@ -1,0 +1,176 @@
+# Security Groups for Diet Management App
+# EC2 allows HTTP/HTTPS/SSH, RDS allows PostgreSQL from EC2 only
+---
+# Security Group for EC2 (public-facing)
+apiVersion: ec2.aws.upbound.io/v1beta1
+kind: SecurityGroup
+metadata:
+  name: diet-app-ec2-sg
+  labels:
+    app: diet-management
+    tier: web
+spec:
+  forProvider:
+    region: ap-southeast-2
+    vpcIdSelector:
+      matchLabels:
+        app: diet-management
+    description: Security group for Diet App EC2 instance
+    tags:
+      Name: diet-app-ec2-sg
+      ManagedBy: crossplane
+  providerConfigRef:
+    name: aws-prod
+---
+# EC2 Inbound Rules
+apiVersion: ec2.aws.upbound.io/v1beta1
+kind: SecurityGroupRule
+metadata:
+  name: diet-app-ec2-http
+spec:
+  forProvider:
+    region: ap-southeast-2
+    type: ingress
+    fromPort: 80
+    toPort: 80
+    protocol: tcp
+    cidrBlocks:
+      - 0.0.0.0/0
+    securityGroupIdSelector:
+      matchLabels:
+        app: diet-management
+        tier: web
+    description: HTTP from anywhere (redirects to HTTPS)
+  providerConfigRef:
+    name: aws-prod
+---
+apiVersion: ec2.aws.upbound.io/v1beta1
+kind: SecurityGroupRule
+metadata:
+  name: diet-app-ec2-https
+spec:
+  forProvider:
+    region: ap-southeast-2
+    type: ingress
+    fromPort: 443
+    toPort: 443
+    protocol: tcp
+    cidrBlocks:
+      - 0.0.0.0/0
+    securityGroupIdSelector:
+      matchLabels:
+        app: diet-management
+        tier: web
+    description: HTTPS from anywhere
+  providerConfigRef:
+    name: aws-prod
+---
+apiVersion: ec2.aws.upbound.io/v1beta1
+kind: SecurityGroupRule
+metadata:
+  name: diet-app-ec2-ssh
+spec:
+  forProvider:
+    region: ap-southeast-2
+    type: ingress
+    fromPort: 22
+    toPort: 22
+    protocol: tcp
+    # IMPORTANT: Restrict this to your IP in production
+    # Use: curl -s https://checkip.amazonaws.com
+    cidrBlocks:
+      - 0.0.0.0/0
+    securityGroupIdSelector:
+      matchLabels:
+        app: diet-management
+        tier: web
+    description: SSH access (restrict to your IP)
+  providerConfigRef:
+    name: aws-prod
+---
+apiVersion: ec2.aws.upbound.io/v1beta1
+kind: SecurityGroupRule
+metadata:
+  name: diet-app-ec2-api
+spec:
+  forProvider:
+    region: ap-southeast-2
+    type: ingress
+    fromPort: 3000
+    toPort: 3000
+    protocol: tcp
+    cidrBlocks:
+      - 0.0.0.0/0
+    securityGroupIdSelector:
+      matchLabels:
+        app: diet-management
+        tier: web
+    description: API port for NestJS application
+  providerConfigRef:
+    name: aws-prod
+---
+apiVersion: ec2.aws.upbound.io/v1beta1
+kind: SecurityGroupRule
+metadata:
+  name: diet-app-ec2-egress
+spec:
+  forProvider:
+    region: ap-southeast-2
+    type: egress
+    fromPort: 0
+    toPort: 0
+    protocol: "-1"
+    cidrBlocks:
+      - 0.0.0.0/0
+    securityGroupIdSelector:
+      matchLabels:
+        app: diet-management
+        tier: web
+    description: All outbound traffic
+  providerConfigRef:
+    name: aws-prod
+---
+# Security Group for RDS (private)
+apiVersion: ec2.aws.upbound.io/v1beta1
+kind: SecurityGroup
+metadata:
+  name: diet-app-rds-sg
+  labels:
+    app: diet-management
+    tier: database
+spec:
+  forProvider:
+    region: ap-southeast-2
+    vpcIdSelector:
+      matchLabels:
+        app: diet-management
+    description: Security group for Diet App RDS instance
+    tags:
+      Name: diet-app-rds-sg
+      ManagedBy: crossplane
+  providerConfigRef:
+    name: aws-prod
+---
+# RDS allows PostgreSQL only from EC2 security group
+apiVersion: ec2.aws.upbound.io/v1beta1
+kind: SecurityGroupRule
+metadata:
+  name: diet-app-rds-postgres
+spec:
+  forProvider:
+    region: ap-southeast-2
+    type: ingress
+    fromPort: 5432
+    toPort: 5432
+    protocol: tcp
+    sourceSecurityGroupIdSelector:
+      matchLabels:
+        app: diet-management
+        tier: web
+    securityGroupIdSelector:
+      matchLabels:
+        app: diet-management
+        tier: database
+    description: PostgreSQL from EC2 only
+  providerConfigRef:
+    name: aws-prod

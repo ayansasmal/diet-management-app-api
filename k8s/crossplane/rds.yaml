@@ -1,0 +1,83 @@
+# RDS PostgreSQL for Diet Management App
+# db.t4g.micro (ARM) - FREE for 12 months under Free Tier
+---
+# DB Subnet Group (required for RDS in VPC)
+apiVersion: rds.aws.upbound.io/v1beta1
+kind: SubnetGroup
+metadata:
+  name: diet-app-db-subnet-group
+  labels:
+    app: diet-management
+spec:
+  forProvider:
+    region: ap-southeast-2
+    description: Subnet group for Diet App RDS
+    subnetIdSelector:
+      matchLabels:
+        app: diet-management
+        type: private
+    tags:
+      Name: diet-app-db-subnet-group
+      ManagedBy: crossplane
+  providerConfigRef:
+    name: aws-prod
+---
+# RDS PostgreSQL Instance
+apiVersion: rds.aws.upbound.io/v1beta1
+kind: Instance
+metadata:
+  name: diet-app-db
+  labels:
+    app: diet-management
+spec:
+  forProvider:
+    region: ap-southeast-2
+    # Database configuration
+    identifier: diet-app-db
+    engine: postgres
+    engineVersion: "16.6"
+    # Instance class: ARM-based for cost savings
+    # t4g.micro: 2 vCPU, 1 GB RAM - FREE for 12 months
+    instanceClass: db.t4g.micro
+    # Storage: 20GB minimum (free tier allows up to 20GB)
+    allocatedStorage: 20
+    storageType: gp2
+    storageEncrypted: true
+    # Database name and credentials
+    dbName: diet_management
+    username: dietapp
+    # Password from Kubernetes secret (created separately)
+    passwordSecretRef:
+      name: rds-master-password
+      namespace: crossplane-system
+      key: password
+    # Networking
+    dbSubnetGroupNameRef:
+      name: diet-app-db-subnet-group
+    vpcSecurityGroupIdRefs:
+      - name: diet-app-rds-sg
+    publiclyAccessible: false
+    # Backup configuration
+    backupRetentionPeriod: 7
+    backupWindow: "03:00-04:00"  # UTC (2pm Sydney)
+    maintenanceWindow: "sun:04:00-sun:05:00"
+    # Performance and availability
+    autoMinorVersionUpgrade: true
+    deletionProtection: false  # Set to true in production
+    skipFinalSnapshot: true    # Set to false in production
+    # Monitoring
+    performanceInsightsEnabled: false  # Costs money, disable for free tier
+    # Tags
+    tags:
+      Name: diet-app-db
+      Environment: production
+      ManagedBy: crossplane
+  providerConfigRef:
+    name: aws-prod
+  # Write connection details to a secret
+  writeConnectionSecretToRef:
+    name: rds-connection-details
+    namespace: diet-app
+# Note: The rds-master-password secret is created by deploy-aws.sh
+# with a randomly generated password. Do NOT define it here to avoid
+# overwriting the generated password.

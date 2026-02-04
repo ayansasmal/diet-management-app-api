@@ -1,0 +1,35 @@
+# Service to expose Diet Management API
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: diet-api
+  namespace: diet-app
+  labels:
+    app: diet-api
+spec:
+  selector:
+    app: diet-api
+  ports:
+    - name: http
+      port: 3000
+      targetPort: 3000
+  type: ClusterIP
+---
+# NodePort service for local access from host machine
+apiVersion: v1
+kind: Service
+metadata:
+  name: diet-api-nodeport
+  namespace: diet-app
+  labels:
+    app: diet-api
+spec:
+  selector:
+    app: diet-api
+  ports:
+    - name: http
+      port: 3000
+      targetPort: 3000
+      nodePort: 30300
+  type: NodePort

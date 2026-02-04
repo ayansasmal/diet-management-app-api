@@ -1,0 +1,87 @@
+# Docker Compose for Production (AWS EC2)
+# Uses CloudWatch for logging via awslogs driver
+# Uses GitHub Container Registry (GHCR) for images
+#
+# Prerequisites:
+#   - EC2 instance with IAM role that has CloudWatchLogsFullAccess
+#   - Login to GHCR: echo $GITHUB_TOKEN | docker login ghcr.io -u USERNAME --password-stdin
+#   - AWS region configured
+#
+# Usage:
+#   export GHCR_IMAGE=ghcr.io/ayansasmal/diet-api:latest
+#   docker-compose -f docker-compose.prod.yml up -d
+
+services:
+  diet-api:
+    image: ${GHCR_IMAGE:-ghcr.io/ayansasmal/diet-api:latest}
+    container_name: diet-api
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATABASE_URL=${DATABASE_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+    # CloudWatch Logs configuration
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${AWS_REGION:-ap-southeast-2}
+        awslogs-group: /diet-app/api
+        awslogs-stream: diet-api
+        awslogs-create-group: "true"
+        # Add timestamp and container info to logs
+        tag: "{{.Name}}/{{.ID}}"
+    # Health check
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    # Resource limits for t4g.micro (1GB RAM)
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+
+  # Caddy reverse proxy with automatic HTTPS
+  caddy:
+    image: caddy:2-alpine
+    container_name: caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    environment:
+      - DOMAIN=${DOMAIN:-localhost}
+      - CORS_ORIGIN=${CORS_ORIGIN:-*}
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${AWS_REGION:-ap-southeast-2}
+        awslogs-group: /diet-app/caddy
+        awslogs-stream: caddy
+        awslogs-create-group: "true"
+    depends_on:
+      diet-api:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+        reservations:
+          memory: 32M
+
+volumes:
+  caddy_data:
+  caddy_config:

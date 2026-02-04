@@ -1,0 +1,99 @@
+# NestJS Diet Management API deployment for local Kubernetes
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: diet-api-config
+  namespace: diet-app
+  labels:
+    app: diet-api
+data:
+  NODE_ENV: development
+  PORT: "3000"
+  # Swagger docs enabled in development
+  SWAGGER_ENABLED: "true"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: diet-api-secret
+  namespace: diet-app
+  labels:
+    app: diet-api
+type: Opaque
+stringData:
+  # JWT secret for local development (use strong secret in production)
+  JWT_SECRET: local-dev-jwt-secret-change-in-production
+  # Google OAuth credentials (replace with your own)
+  GOOGLE_CLIENT_ID: your-google-client-id.apps.googleusercontent.com
+  GOOGLE_CLIENT_SECRET: your-google-client-secret
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: diet-api
+  namespace: diet-app
+  labels:
+    app: diet-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: diet-api
+  template:
+    metadata:
+      labels:
+        app: diet-api
+    spec:
+      initContainers:
+        # Wait for PostgreSQL to be ready before starting the app
+        - name: wait-for-postgres
+          image: postgres:16-alpine
+          command:
+            - sh
+            - -c
+            - |
+              until pg_isready -h postgres -U dietapp -d diet_management; do
+                echo "Waiting for PostgreSQL..."
+                sleep 2
+              done
+              echo "PostgreSQL is ready!"
+      containers:
+        - name: diet-api
+          image: diet-api:local
+          imagePullPolicy: Never  # Use local image
+          ports:
+            - containerPort: 3000
+          envFrom:
+            - configMapRef:
+                name: diet-api-config
+            - secretRef:
+                name: diet-api-secret
+          env:
+            # Database URL from postgres secret
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: DATABASE_URL
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          livenessProbe:
+            httpGet:
+              path: /api/health/live
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /api/health/ready
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 5

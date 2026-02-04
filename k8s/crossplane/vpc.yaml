@@ -1,0 +1,166 @@
+# VPC and Networking for Diet Management App
+# Creates VPC with public and private subnets in ap-southeast-2
+---
+apiVersion: ec2.aws.upbound.io/v1beta1
+kind: VPC
+metadata:
+  name: diet-app-vpc
+  labels:
+    app: diet-management
+spec:
+  forProvider:
+    region: ap-southeast-2
+    cidrBlock: 10.0.0.0/16
+    enableDnsHostnames: true
+    enableDnsSupport: true
+    tags:
+      Name: diet-app-vpc
+      Environment: production
+      ManagedBy: crossplane
+  providerConfigRef:
+    name: aws-prod
+---
+apiVersion: ec2.aws.upbound.io/v1beta1
+kind: InternetGateway
+metadata:
+  name: diet-app-igw
+  labels:
+    app: diet-management
+spec:
+  forProvider:
+    region: ap-southeast-2
+    vpcIdSelector:
+      matchLabels:
+        app: diet-management
+    tags:
+      Name: diet-app-igw
+      ManagedBy: crossplane
+  providerConfigRef:
+    name: aws-prod
+---
+# Public Subnet (for EC2 with Elastic IP)
+apiVersion: ec2.aws.upbound.io/v1beta1
+kind: Subnet
+metadata:
+  name: diet-app-public-a
+  labels:
+    app: diet-management
+    type: public
+spec:
+  forProvider:
+    region: ap-southeast-2
+    availabilityZone: ap-southeast-2a
+    vpcIdSelector:
+      matchLabels:
+        app: diet-management
+    cidrBlock: 10.0.1.0/24
+    mapPublicIpOnLaunch: true
+    tags:
+      Name: diet-app-public-a
+      Type: public
+      ManagedBy: crossplane
+  providerConfigRef:
+    name: aws-prod
+---
+# Private Subnet A (for RDS - primary)
+apiVersion: ec2.aws.upbound.io/v1beta1
+kind: Subnet
+metadata:
+  name: diet-app-private-a
+  labels:
+    app: diet-management
+    type: private
+spec:
+  forProvider:
+    region: ap-southeast-2
+    availabilityZone: ap-southeast-2a
+    vpcIdSelector:
+      matchLabels:
+        app: diet-management
+    cidrBlock: 10.0.10.0/24
+    mapPublicIpOnLaunch: false
+    tags:
+      Name: diet-app-private-a
+      Type: private
+      ManagedBy: crossplane
+  providerConfigRef:
+    name: aws-prod
+---
+# Private Subnet B (for RDS - required for DB subnet group)
+apiVersion: ec2.aws.upbound.io/v1beta1
+kind: Subnet
+metadata:
+  name: diet-app-private-b
+  labels:
+    app: diet-management
+    type: private
+spec:
+  forProvider:
+    region: ap-southeast-2
+    availabilityZone: ap-southeast-2b
+    vpcIdSelector:
+      matchLabels:
+        app: diet-management
+    cidrBlock: 10.0.11.0/24
+    mapPublicIpOnLaunch: false
+    tags:
+      Name: diet-app-private-b
+      Type: private
+      ManagedBy: crossplane
+  providerConfigRef:
+    name: aws-prod
+---
+# Route Table for Public Subnet
+apiVersion: ec2.aws.upbound.io/v1beta1
+kind: RouteTable
+metadata:
+  name: diet-app-public-rt
+  labels:
+    app: diet-management
+spec:
+  forProvider:
+    region: ap-southeast-2
+    vpcIdSelector:
+      matchLabels:
+        app: diet-management
+    tags:
+      Name: diet-app-public-rt
+      ManagedBy: crossplane
+  providerConfigRef:
+    name: aws-prod
+---
+# Route to Internet Gateway
+apiVersion: ec2.aws.upbound.io/v1beta1
+kind: Route
+metadata:
+  name: diet-app-public-route
+spec:
+  forProvider:
+    region: ap-southeast-2
+    routeTableIdSelector:
+      matchLabels:
+        app: diet-management
+    destinationCidrBlock: 0.0.0.0/0
+    gatewayIdSelector:
+      matchLabels:
+        app: diet-management
+  providerConfigRef:
+    name: aws-prod
+---
+# Associate Public Subnet with Route Table
+apiVersion: ec2.aws.upbound.io/v1beta1
+kind: RouteTableAssociation
+metadata:
+  name: diet-app-public-a-assoc
+spec:
+  forProvider:
+    region: ap-southeast-2
+    routeTableIdSelector:
+      matchLabels:
+        app: diet-management
+    subnetIdSelector:
+      matchLabels:
+        app: diet-management
+        type: public
+  providerConfigRef:
+    name: aws-prod

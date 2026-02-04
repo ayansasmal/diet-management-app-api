@@ -1,0 +1,61 @@
+# Helm values for LocalStack
+# Install with: helm install localstack localstack/localstack -f localstack-values.yaml -n diet-app
+
+# Enable persistence for local state
+persistence:
+  enabled: true
+  size: 1Gi
+
+# Services to enable (simulates AWS)
+enabledServices:
+  - s3
+  - secretsmanager
+  - ec2
+  - rds
+  - route53
+
+# Resource limits for local development
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 2Gi
+
+# LocalStack configuration
+extraEnvVars:
+  - name: DEBUG
+    value: "1"
+  - name: PERSISTENCE
+    value: "1"
+  - name: AWS_DEFAULT_REGION
+    value: "ap-southeast-2"
+  # Pro features (optional - requires license key)
+  # - name: LOCALSTACK_API_KEY
+  #   valueFrom:
+  #     secretKeyRef:
+  #       name: localstack-pro
+  #       key: api-key
+
+# Service type for local access
+service:
+  type: ClusterIP
+  edgeService:
+    type: NodePort
+    nodePort: 30566
+
+# Probes
+livenessProbe:
+  httpGet:
+    path: /_localstack/health
+    port: 4566
+  initialDelaySeconds: 30
+  periodSeconds: 10
+
+readinessProbe:
+  httpGet:
+    path: /_localstack/health
+    port: 4566
+  initialDelaySeconds: 10
+  periodSeconds: 5

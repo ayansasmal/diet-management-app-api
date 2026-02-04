@@ -1,0 +1,125 @@
+# S3 Bucket for Diet Management App
+# Stores meal photos and user uploads
+---
+apiVersion: s3.aws.upbound.io/v1beta1
+kind: Bucket
+metadata:
+  # Bucket name must be globally unique - using account ID suffix
+  # The metadata.name becomes the bucket name in AWS
+  name: diet-app-uploads-851112554948
+  labels:
+    app: diet-management
+spec:
+  forProvider:
+    region: ap-southeast-2
+    tags:
+      Name: diet-app-uploads
+      Environment: production
+      ManagedBy: crossplane
+  providerConfigRef:
+    name: aws-prod
+---
+# Bucket versioning for data protection
+apiVersion: s3.aws.upbound.io/v1beta1
+kind: BucketVersioning
+metadata:
+  name: diet-app-uploads-versioning
+spec:
+  forProvider:
+    region: ap-southeast-2
+    bucketSelector:
+      matchLabels:
+        app: diet-management
+    versioningConfiguration:
+      - status: Enabled
+  providerConfigRef:
+    name: aws-prod
+---
+# Server-side encryption
+apiVersion: s3.aws.upbound.io/v1beta1
+kind: BucketServerSideEncryptionConfiguration
+metadata:
+  name: diet-app-uploads-encryption
+spec:
+  forProvider:
+    region: ap-southeast-2
+    bucketSelector:
+      matchLabels:
+        app: diet-management
+    rule:
+      - applyServerSideEncryptionByDefault:
+          - sseAlgorithm: AES256
+  providerConfigRef:
+    name: aws-prod
+---
+# Block public access
+apiVersion: s3.aws.upbound.io/v1beta1
+kind: BucketPublicAccessBlock
+metadata:
+  name: diet-app-uploads-public-access
+spec:
+  forProvider:
+    region: ap-southeast-2
+    bucketSelector:
+      matchLabels:
+        app: diet-management
+    blockPublicAcls: true
+    blockPublicPolicy: true
+    ignorePublicAcls: true
+    restrictPublicBuckets: true
+  providerConfigRef:
+    name: aws-prod
+---
+# Lifecycle rules for cost management
+apiVersion: s3.aws.upbound.io/v1beta1
+kind: BucketLifecycleConfiguration
+metadata:
+  name: diet-app-uploads-lifecycle
+spec:
+  forProvider:
+    region: ap-southeast-2
+    bucketSelector:
+      matchLabels:
+        app: diet-management
+    rule:
+      - id: transition-to-ia
+        status: Enabled
+        filter:
+          - prefix: uploads/
+        transition:
+          - days: 90
+            storageClass: STANDARD_IA
+      - id: expire-old-versions
+        status: Enabled
+        noncurrentVersionExpiration:
+          - noncurrentDays: 30
+  providerConfigRef:
+    name: aws-prod
+---
+# CORS configuration for frontend uploads
+apiVersion: s3.aws.upbound.io/v1beta1
+kind: BucketCorsConfiguration
+metadata:
+  name: diet-app-uploads-cors
+spec:
+  forProvider:
+    region: ap-southeast-2
+    bucketSelector:
+      matchLabels:
+        app: diet-management
+    corsRule:
+      - allowedHeaders:
+          - "*"
+        allowedMethods:
+          - GET
+          - PUT
+          - POST
+        allowedOrigins:
+          # Replace with your Vercel domain
+          - "https://your-app.vercel.app"
+          - "http://localhost:3001"
+        exposeHeaders:
+          - ETag
+        maxAgeSeconds: 3600
+  providerConfigRef:
+    name: aws-prod

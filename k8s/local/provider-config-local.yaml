@@ -1,0 +1,41 @@
+# Crossplane Provider Configuration for LocalStack
+# Points AWS provider to LocalStack endpoint for local development
+#
+# LocalStack Endpoint Options:
+#   - In-cluster:  http://localstack.diet-app.svc.cluster.local:4566
+#   - Host machine: http://host.docker.internal:4566  (Docker Desktop)
+#   - Custom:       Set LOCALSTACK_ENDPOINT env var before running deploy script
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: aws-creds-local
+  namespace: crossplane-system
+type: Opaque
+stringData:
+  # Dummy credentials for LocalStack (it doesn't validate them)
+  creds: |
+    [default]
+    aws_access_key_id = test
+    aws_secret_access_key = test
+    region = ap-southeast-2
+---
+apiVersion: aws.upbound.io/v1beta1
+kind: ProviderConfig
+metadata:
+  name: localstack
+spec:
+  credentials:
+    source: Secret
+    secretRef:
+      namespace: crossplane-system
+      name: aws-creds-local
+      key: creds
+  # Point to LocalStack endpoint
+  # Use host.docker.internal for LocalStack running on host machine
+  endpoint:
+    url:
+      static: http://host.docker.internal:4566
+      type: Static
+    # Use path-style S3 (required for LocalStack)
+    hostnameImmutable: true

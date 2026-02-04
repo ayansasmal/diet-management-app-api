@@ -1,0 +1,703 @@
+# CloudWatch Logging, Metrics, and Alarms for Diet Management App
+# =============================================================================
+#
+# Components:
+#   1. Log Groups - Store application logs
+#   2. Metric Filters - Extract metrics from logs
+#   3. SNS Topic - Notification channel
+#   4. Alarms - Alert on thresholds
+#
+# After deploying:
+#   1. Subscribe your email to SNS topic in AWS Console
+#   2. Update YOUR_ACCOUNT_ID placeholders
+#   3. Update YOUR_INSTANCE_ID after EC2 is created
+#   4. Update YOUR_HEALTH_CHECK_ID after Route53 health check is created
+#
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# LOG GROUPS
+# -----------------------------------------------------------------------------
+---
+apiVersion: cloudwatchlogs.aws.upbound.io/v1beta1
+kind: Group
+metadata:
+  name: diet-app-api-logs
+  labels:
+    app: diet-management
+    component: logging
+spec:
+  forProvider:
+    region: ap-southeast-2
+    name: /diet-app/api
+    retentionInDays: 30
+    tags:
+      Name: diet-app-api-logs
+      Environment: production
+      ManagedBy: crossplane
+  providerConfigRef:
+    name: aws-prod
+---
+apiVersion: cloudwatchlogs.aws.upbound.io/v1beta1
+kind: Group
+metadata:
+  name: diet-app-caddy-logs
+  labels:
+    app: diet-management
+    component: logging
+spec:
+  forProvider:
+    region: ap-southeast-2
+    name: /diet-app/caddy
+    retentionInDays: 14
+    tags:
+      Name: diet-app-caddy-logs
+      Environment: production
+      ManagedBy: crossplane
+  providerConfigRef:
+    name: aws-prod
+
+# -----------------------------------------------------------------------------
+# METRIC FILTERS (Extract metrics from logs)
+# -----------------------------------------------------------------------------
+---
+# Count ERROR level logs
+apiVersion: cloudwatchlogs.aws.upbound.io/v1beta1
+kind: MetricFilter
+metadata:
+  name: diet-app-error-count
+  labels:
+    app: diet-management
+    component: metrics
+spec:
+  forProvider:
+    region: ap-southeast-2
+    name: ErrorCount
+    logGroupName: /diet-app/api
+    pattern: "?ERROR ?error ?Error ?\"level\":\"error\""
+    metricTransformation:
+      - name: ErrorCount
+        namespace: DietApp
+        value: "1"
+        defaultValue: "0"
+  providerConfigRef:
+    name: aws-prod
+---
+# Count HTTP 5xx responses
+apiVersion: cloudwatchlogs.aws.upbound.io/v1beta1
+kind: MetricFilter
+metadata:
+  name: diet-app-5xx-count
+  labels:
+    app: diet-management
+    component: metrics
+spec:
+  forProvider:
+    region: ap-southeast-2
+    name: Http5xxCount
+    logGroupName: /diet-app/api
+    pattern: "[..., status_code=5*, ...]"
+    metricTransformation:
+      - name: Http5xxCount
+        namespace: DietApp
+        value: "1"
+        defaultValue: "0"
+  providerConfigRef:
+    name: aws-prod
+---
+# Count HTTP 4xx responses (client errors)
+apiVersion: cloudwatchlogs.aws.upbound.io/v1beta1
+kind: MetricFilter
+metadata:
+  name: diet-app-4xx-count
+  labels:
+    app: diet-management
+    component: metrics
+spec:
+  forProvider:
+    region: ap-southeast-2
+    name: Http4xxCount
+    logGroupName: /diet-app/api
+    pattern: "[..., status_code=4*, ...]"
+    metricTransformation:
+      - name: Http4xxCount
+        namespace: DietApp
+        value: "1"
+        defaultValue: "0"
+  providerConfigRef:
+    name: aws-prod
+---
+# Count total requests
+apiVersion: cloudwatchlogs.aws.upbound.io/v1beta1
+kind: MetricFilter
+metadata:
+  name: diet-app-request-count
+  labels:
+    app: diet-management
+    component: metrics
+spec:
+  forProvider:
+    region: ap-southeast-2
+    name: RequestCount
+    logGroupName: /diet-app/api
+    pattern: "{ $.method = * }"
+    metricTransformation:
+      - name: RequestCount
+        namespace: DietApp
+        value: "1"
+        defaultValue: "0"
+  providerConfigRef:
+    name: aws-prod
+---
+# Track authentication failures
+apiVersion: cloudwatchlogs.aws.upbound.io/v1beta1
+kind: MetricFilter
+metadata:
+  name: diet-app-auth-failures
+  labels:
+    app: diet-management
+    component: metrics
+spec:
+  forProvider:
+    region: ap-southeast-2
+    name: AuthFailures
+    logGroupName: /diet-app/api
+    pattern: "?Unauthorized ?\"statusCode\":401 ?\"status\":401"
+    metricTransformation:
+      - name: AuthFailures
+        namespace: DietApp
+        value: "1"
+        defaultValue: "0"
+  providerConfigRef:
+    name: aws-prod
+---
+# Track database errors
+apiVersion: cloudwatchlogs.aws.upbound.io/v1beta1
+kind: MetricFilter
+metadata:
+  name: diet-app-db-errors
+  labels:
+    app: diet-management
+    component: metrics
+spec:
+  forProvider:
+    region: ap-southeast-2
+    name: DatabaseErrors
+    logGroupName: /diet-app/api
+    pattern: "?PrismaClientKnownRequestError ?PrismaClientUnknownRequestError ?\"ECONNREFUSED\" ?\"connection refused\""
+    metricTransformation:
+      - name: DatabaseErrors
+        namespace: DietApp
+        value: "1"
+        defaultValue: "0"
+  providerConfigRef:
+    name: aws-prod
+
+# -----------------------------------------------------------------------------
+# SNS TOPIC (Notification channel)
+# -----------------------------------------------------------------------------
+---
+apiVersion: sns.aws.upbound.io/v1beta1
+kind: Topic
+metadata:
+  name: diet-app-alerts
+  labels:
+    app: diet-management
+    component: notifications
+spec:
+  forProvider:
+    region: ap-southeast-2
+    name: diet-app-alerts
+    displayName: "Diet App Alerts"
+    tags:
+      Name: diet-app-alerts
+      ManagedBy: crossplane
+  providerConfigRef:
+    name: aws-prod
+
+# -----------------------------------------------------------------------------
+# ALARMS - Application Level
+# -----------------------------------------------------------------------------
+---
+# ALARM: High Error Rate
+apiVersion: cloudwatch.aws.upbound.io/v1beta1
+kind: MetricAlarm
+metadata:
+  name: diet-app-high-errors
+  labels:
+    app: diet-management
+    component: alarms
+    severity: critical
+spec:
+  forProvider:
+    region: ap-southeast-2
+    alarmName: diet-app-high-error-rate
+    alarmDescription: |
+      CRITICAL: Error rate exceeded threshold.
+      More than 10 errors in 5 minutes.
+      Check CloudWatch Logs: /diet-app/api
+    comparisonOperator: GreaterThanThreshold
+    evaluationPeriods: 1
+    metricName: ErrorCount
+    namespace: DietApp
+    period: 300
+    statistic: Sum
+    threshold: 10
+    actionsEnabled: true
+    alarmActions:
+      - arn:aws:sns:ap-southeast-2:YOUR_ACCOUNT_ID:diet-app-alerts
+    okActions:
+      - arn:aws:sns:ap-southeast-2:YOUR_ACCOUNT_ID:diet-app-alerts
+    treatMissingData: notBreaching
+    tags:
+      Name: diet-app-high-errors
+      Severity: critical
+      ManagedBy: crossplane
+  providerConfigRef:
+    name: aws-prod
+---
+# ALARM: High 5xx Error Rate
+apiVersion: cloudwatch.aws.upbound.io/v1beta1
+kind: MetricAlarm
+metadata:
+  name: diet-app-high-5xx
+  labels:
+    app: diet-management
+    component: alarms
+    severity: critical
+spec:
+  forProvider:
+    region: ap-southeast-2
+    alarmName: diet-app-high-5xx-errors
+    alarmDescription: |
+      CRITICAL: High rate of HTTP 5xx errors.
+      More than 5 server errors in 5 minutes.
+      Indicates application or database issues.
+    comparisonOperator: GreaterThanThreshold
+    evaluationPeriods: 1
+    metricName: Http5xxCount
+    namespace: DietApp
+    period: 300
+    statistic: Sum
+    threshold: 5
+    actionsEnabled: true
+    alarmActions:
+      - arn:aws:sns:ap-southeast-2:YOUR_ACCOUNT_ID:diet-app-alerts
+    okActions:
+      - arn:aws:sns:ap-southeast-2:YOUR_ACCOUNT_ID:diet-app-alerts
+    treatMissingData: notBreaching
+    tags:
+      Name: diet-app-high-5xx
+      Severity: critical
+      ManagedBy: crossplane
+  providerConfigRef:
+    name: aws-prod
+---
+# ALARM: Database Connection Errors
+apiVersion: cloudwatch.aws.upbound.io/v1beta1
+kind: MetricAlarm
+metadata:
+  name: diet-app-db-errors
+  labels:
+    app: diet-management
+    component: alarms
+    severity: critical
+spec:
+  forProvider:
+    region: ap-southeast-2
+    alarmName: diet-app-database-errors
+    alarmDescription: |
+      CRITICAL: Database connection errors detected.
+      Check RDS instance status and connectivity.
+      May indicate RDS is down or network issues.
+    comparisonOperator: GreaterThanThreshold
+    evaluationPeriods: 1
+    metricName: DatabaseErrors
+    namespace: DietApp
+    period: 60
+    statistic: Sum
+    threshold: 1
+    actionsEnabled: true
+    alarmActions:
+      - arn:aws:sns:ap-southeast-2:YOUR_ACCOUNT_ID:diet-app-alerts
+    okActions:
+      - arn:aws:sns:ap-southeast-2:YOUR_ACCOUNT_ID:diet-app-alerts
+    treatMissingData: notBreaching
+    tags:
+      Name: diet-app-db-errors
+      Severity: critical
+      ManagedBy: crossplane
+  providerConfigRef:
+    name: aws-prod
+---
+# ALARM: Authentication Failures Spike (Possible Attack)
+apiVersion: cloudwatch.aws.upbound.io/v1beta1
+kind: MetricAlarm
+metadata:
+  name: diet-app-auth-failures
+  labels:
+    app: diet-management
+    component: alarms
+    severity: warning
+spec:
+  forProvider:
+    region: ap-southeast-2
+    alarmName: diet-app-auth-failures-spike
+    alarmDescription: |
+      WARNING: High number of authentication failures.
+      More than 20 failed auth attempts in 5 minutes.
+      Could indicate brute force attack or misconfigured client.
+    comparisonOperator: GreaterThanThreshold
+    evaluationPeriods: 1
+    metricName: AuthFailures
+    namespace: DietApp
+    period: 300
+    statistic: Sum
+    threshold: 20
+    actionsEnabled: true
+    alarmActions:
+      - arn:aws:sns:ap-southeast-2:YOUR_ACCOUNT_ID:diet-app-alerts
+    treatMissingData: notBreaching
+    tags:
+      Name: diet-app-auth-failures
+      Severity: warning
+      ManagedBy: crossplane
+  providerConfigRef:
+    name: aws-prod
+---
+# ALARM: No Requests (App might be down)
+apiVersion: cloudwatch.aws.upbound.io/v1beta1
+kind: MetricAlarm
+metadata:
+  name: diet-app-no-requests
+  labels:
+    app: diet-management
+    component: alarms
+    severity: warning
+spec:
+  forProvider:
+    region: ap-southeast-2
+    alarmName: diet-app-no-requests
+    alarmDescription: |
+      WARNING: No API requests in 15 minutes.
+      Application might be down or unreachable.
+      Check EC2 instance and Docker container status.
+    comparisonOperator: LessThanThreshold
+    evaluationPeriods: 3
+    metricName: RequestCount
+    namespace: DietApp
+    period: 300
+    statistic: Sum
+    threshold: 1
+    actionsEnabled: true
+    alarmActions:
+      - arn:aws:sns:ap-southeast-2:YOUR_ACCOUNT_ID:diet-app-alerts
+    okActions:
+      - arn:aws:sns:ap-southeast-2:YOUR_ACCOUNT_ID:diet-app-alerts
+    treatMissingData: breaching
+    tags:
+      Name: diet-app-no-requests
+      Severity: warning
+      ManagedBy: crossplane
+  providerConfigRef:
+    name: aws-prod
+
+# -----------------------------------------------------------------------------
+# ALARMS - EC2 Infrastructure Level
+# -----------------------------------------------------------------------------
+---
+# ALARM: EC2 CPU High
+apiVersion: cloudwatch.aws.upbound.io/v1beta1
+kind: MetricAlarm
+metadata:
+  name: diet-app-ec2-cpu-high
+  labels:
+    app: diet-management
+    component: alarms
+    severity: warning
+spec:
+  forProvider:
+    region: ap-southeast-2
+    alarmName: diet-app-ec2-cpu-high
+    alarmDescription: |
+      WARNING: EC2 CPU utilization is high.
+      Above 80% for 10 minutes.
+      Consider upgrading to t4g.small if persistent.
+    comparisonOperator: GreaterThanThreshold
+    evaluationPeriods: 2
+    metricName: CPUUtilization
+    namespace: AWS/EC2
+    period: 300
+    statistic: Average
+    threshold: 80
+    actionsEnabled: true
+    alarmActions:
+      - arn:aws:sns:ap-southeast-2:YOUR_ACCOUNT_ID:diet-app-alerts
+    okActions:
+      - arn:aws:sns:ap-southeast-2:YOUR_ACCOUNT_ID:diet-app-alerts
+    # Dimensions added after EC2 creation
+    # dimensions:
+    #   - name: InstanceId
+    #     value: YOUR_INSTANCE_ID
+    treatMissingData: notBreaching
+    tags:
+      Name: diet-app-ec2-cpu-high
+      Severity: warning
+      ManagedBy: crossplane
+  providerConfigRef:
+    name: aws-prod
+---
+# ALARM: EC2 Status Check Failed
+apiVersion: cloudwatch.aws.upbound.io/v1beta1
+kind: MetricAlarm
+metadata:
+  name: diet-app-ec2-status-check
+  labels:
+    app: diet-management
+    component: alarms
+    severity: critical
+spec:
+  forProvider:
+    region: ap-southeast-2
+    alarmName: diet-app-ec2-status-check-failed
+    alarmDescription: |
+      CRITICAL: EC2 instance status check failed.
+      Instance may be impaired or unreachable.
+      Check AWS Console for instance status.
+    comparisonOperator: GreaterThanThreshold
+    evaluationPeriods: 2
+    metricName: StatusCheckFailed
+    namespace: AWS/EC2
+    period: 60
+    statistic: Maximum
+    threshold: 0
+    actionsEnabled: true
+    alarmActions:
+      - arn:aws:sns:ap-southeast-2:YOUR_ACCOUNT_ID:diet-app-alerts
+    okActions:
+      - arn:aws:sns:ap-southeast-2:YOUR_ACCOUNT_ID:diet-app-alerts
+    # Dimensions added after EC2 creation
+    # dimensions:
+    #   - name: InstanceId
+    #     value: YOUR_INSTANCE_ID
+    treatMissingData: notBreaching
+    tags:
+      Name: diet-app-ec2-status-check
+      Severity: critical
+      ManagedBy: crossplane
+  providerConfigRef:
+    name: aws-prod
+
+# -----------------------------------------------------------------------------
+# ALARMS - RDS Database Level
+# -----------------------------------------------------------------------------
+---
+# ALARM: RDS CPU High
+apiVersion: cloudwatch.aws.upbound.io/v1beta1
+kind: MetricAlarm
+metadata:
+  name: diet-app-rds-cpu-high
+  labels:
+    app: diet-management
+    component: alarms
+    severity: warning
+spec:
+  forProvider:
+    region: ap-southeast-2
+    alarmName: diet-app-rds-cpu-high
+    alarmDescription: |
+      WARNING: RDS CPU utilization is high.
+      Above 80% for 10 minutes.
+      Check for slow queries or connection leaks.
+    comparisonOperator: GreaterThanThreshold
+    evaluationPeriods: 2
+    metricName: CPUUtilization
+    namespace: AWS/RDS
+    period: 300
+    statistic: Average
+    threshold: 80
+    actionsEnabled: true
+    alarmActions:
+      - arn:aws:sns:ap-southeast-2:YOUR_ACCOUNT_ID:diet-app-alerts
+    okActions:
+      - arn:aws:sns:ap-southeast-2:YOUR_ACCOUNT_ID:diet-app-alerts
+    dimensions:
+      - name: DBInstanceIdentifier
+        value: diet-app-db
+    treatMissingData: notBreaching
+    tags:
+      Name: diet-app-rds-cpu-high
+      Severity: warning
+      ManagedBy: crossplane
+  providerConfigRef:
+    name: aws-prod
+---
+# ALARM: RDS Free Storage Low
+apiVersion: cloudwatch.aws.upbound.io/v1beta1
+kind: MetricAlarm
+metadata:
+  name: diet-app-rds-storage-low
+  labels:
+    app: diet-management
+    component: alarms
+    severity: warning
+spec:
+  forProvider:
+    region: ap-southeast-2
+    alarmName: diet-app-rds-storage-low
+    alarmDescription: |
+      WARNING: RDS free storage is low.
+      Less than 2GB remaining.
+      Consider increasing storage or cleaning up data.
+    comparisonOperator: LessThanThreshold
+    evaluationPeriods: 1
+    metricName: FreeStorageSpace
+    namespace: AWS/RDS
+    period: 300
+    statistic: Average
+    threshold: 2147483648  # 2GB in bytes
+    actionsEnabled: true
+    alarmActions:
+      - arn:aws:sns:ap-southeast-2:YOUR_ACCOUNT_ID:diet-app-alerts
+    dimensions:
+      - name: DBInstanceIdentifier
+        value: diet-app-db
+    treatMissingData: notBreaching
+    tags:
+      Name: diet-app-rds-storage-low
+      Severity: warning
+      ManagedBy: crossplane
+  providerConfigRef:
+    name: aws-prod
+---
+# ALARM: RDS Freeable Memory Low
+apiVersion: cloudwatch.aws.upbound.io/v1beta1
+kind: MetricAlarm
+metadata:
+  name: diet-app-rds-memory-low
+  labels:
+    app: diet-management
+    component: alarms
+    severity: warning
+spec:
+  forProvider:
+    region: ap-southeast-2
+    alarmName: diet-app-rds-memory-low
+    alarmDescription: |
+      WARNING: RDS freeable memory is low.
+      Less than 100MB remaining.
+      May cause performance issues or OOM.
+    comparisonOperator: LessThanThreshold
+    evaluationPeriods: 2
+    metricName: FreeableMemory
+    namespace: AWS/RDS
+    period: 300
+    statistic: Average
+    threshold: 104857600  # 100MB in bytes
+    actionsEnabled: true
+    alarmActions:
+      - arn:aws:sns:ap-southeast-2:YOUR_ACCOUNT_ID:diet-app-alerts
+    okActions:
+      - arn:aws:sns:ap-southeast-2:YOUR_ACCOUNT_ID:diet-app-alerts
+    dimensions:
+      - name: DBInstanceIdentifier
+        value: diet-app-db
+    treatMissingData: notBreaching
+    tags:
+      Name: diet-app-rds-memory-low
+      Severity: warning
+      ManagedBy: crossplane
+  providerConfigRef:
+    name: aws-prod
+---
+# ALARM: RDS Connection Count High
+apiVersion: cloudwatch.aws.upbound.io/v1beta1
+kind: MetricAlarm
+metadata:
+  name: diet-app-rds-connections-high
+  labels:
+    app: diet-management
+    component: alarms
+    severity: warning
+spec:
+  forProvider:
+    region: ap-southeast-2
+    alarmName: diet-app-rds-connections-high
+    alarmDescription: |
+      WARNING: RDS connection count is high.
+      More than 50 connections (db.t4g.micro max ~80).
+      Check for connection leaks in application.
+    comparisonOperator: GreaterThanThreshold
+    evaluationPeriods: 2
+    metricName: DatabaseConnections
+    namespace: AWS/RDS
+    period: 300
+    statistic: Average
+    threshold: 50
+    actionsEnabled: true
+    alarmActions:
+      - arn:aws:sns:ap-southeast-2:YOUR_ACCOUNT_ID:diet-app-alerts
+    okActions:
+      - arn:aws:sns:ap-southeast-2:YOUR_ACCOUNT_ID:diet-app-alerts
+    dimensions:
+      - name: DBInstanceIdentifier
+        value: diet-app-db
+    treatMissingData: notBreaching
+    tags:
+      Name: diet-app-rds-connections-high
+      Severity: warning
+      ManagedBy: crossplane
+  providerConfigRef:
+    name: aws-prod
+
+# -----------------------------------------------------------------------------
+# ALARMS - Route 53 Health Check
+# -----------------------------------------------------------------------------
+---
+# ALARM: API Endpoint Unhealthy
+apiVersion: cloudwatch.aws.upbound.io/v1beta1
+kind: MetricAlarm
+metadata:
+  name: diet-app-endpoint-unhealthy
+  labels:
+    app: diet-management
+    component: alarms
+    severity: critical
+spec:
+  forProvider:
+    region: us-east-1  # Route 53 metrics are in us-east-1
+    alarmName: diet-app-endpoint-unhealthy
+    alarmDescription: |
+      CRITICAL: API health check is failing.
+      Endpoint /api/health/live is not responding.
+      Check EC2, Docker container, and Caddy status.
+    comparisonOperator: LessThanThreshold
+    evaluationPeriods: 2
+    metricName: HealthCheckStatus
+    namespace: AWS/Route53
+    period: 60
+    statistic: Minimum
+    threshold: 1
+    actionsEnabled: true
+    alarmActions:
+      - arn:aws:sns:ap-southeast-2:YOUR_ACCOUNT_ID:diet-app-alerts
+    okActions:
+      - arn:aws:sns:ap-southeast-2:YOUR_ACCOUNT_ID:diet-app-alerts
+    # Dimensions added after health check creation
+    # dimensions:
+    #   - name: HealthCheckId
+    #     value: YOUR_HEALTH_CHECK_ID
+    treatMissingData: breaching
+    tags:
+      Name: diet-app-endpoint-unhealthy
+      Severity: critical
+      ManagedBy: crossplane
+  providerConfigRef:
+    name: aws-prod
+
+# -----------------------------------------------------------------------------
+# COMPOSITE ALARM - Overall System Health
+# -----------------------------------------------------------------------------
+# Note: Composite alarms require specific API support
+# This would combine multiple alarms into one "system unhealthy" alarm
+# For now, individual alarms provide sufficient coverage

@@ -9,6 +9,10 @@ build/
 .env
 .env.local
 .env.*.local
+# Note: .env.prod is a template (no secrets) - safe to commit
+
+# Crossplane deployment state
+.crossplane-checksums
 
 # Prisma
 /generated/prisma

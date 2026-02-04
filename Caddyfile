@@ -1,0 +1,71 @@
+# Caddyfile - HTTPS reverse proxy for Diet Management API
+# Automatic HTTPS via Let's Encrypt (free SSL certificates)
+
+# =============================================================================
+# Production Configuration
+# =============================================================================
+# Replace {$DOMAIN} with your actual domain (e.g., api.yourdomain.com)
+# When running: DOMAIN=api.yourdomain.com caddy run
+
+{$DOMAIN:localhost} {
+    # Reverse proxy to NestJS application
+    reverse_proxy localhost:3000 {
+        # Health checks for backend
+        health_uri /api/health/live
+        health_interval 30s
+        health_timeout 5s
+        health_status 200
+
+        # Headers for proper proxying
+        header_up Host {upstream_hostport}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+
+    # Security headers
+    header {
+        # Prevent clickjacking
+        X-Frame-Options "SAMEORIGIN"
+        # Prevent MIME type sniffing
+        X-Content-Type-Options "nosniff"
+        # XSS protection
+        X-XSS-Protection "1; mode=block"
+        # Referrer policy
+        Referrer-Policy "strict-origin-when-cross-origin"
+        # Remove server header
+        -Server
+    }
+
+    # CORS handling (allow frontend domain)
+    @cors_preflight method OPTIONS
+    handle @cors_preflight {
+        header Access-Control-Allow-Origin "{$CORS_ORIGIN:*}"
+        header Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+        header Access-Control-Allow-Headers "Authorization, Content-Type"
+        header Access-Control-Max-Age "86400"
+        respond "" 204
+    }
+
+    # Gzip compression for responses
+    encode gzip
+
+    # Access logging
+    log {
+        output file /var/log/caddy/access.log {
+            roll_size 10MB
+            roll_keep 5
+        }
+        format json
+    }
+}
+
+# =============================================================================
+# Local Development Configuration (HTTP only)
+# =============================================================================
+# Use this block for local development without SSL:
+# caddy run --config Caddyfile.local
+#
+# :80 {
+#     reverse_proxy localhost:3000
+# }
