@@ -25,6 +25,7 @@ services:
       - JWT_SECRET=${JWT_SECRET}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - FRONTEND_URL=${FRONTEND_URL:-https://diet-management-app-tau.vercel.app}
     # CloudWatch Logs configuration
     logging:
       driver: awslogs
