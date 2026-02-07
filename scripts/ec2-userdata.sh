@@ -91,6 +91,7 @@ DATABASE_URL=$(echo "$SECRETS" | jq -r '.DATABASE_URL')
 JWT_SECRET=$(echo "$SECRETS" | jq -r '.JWT_SECRET')
 GOOGLE_CLIENT_ID=$(echo "$SECRETS" | jq -r '.GOOGLE_CLIENT_ID')
 GOOGLE_CLIENT_SECRET=$(echo "$SECRETS" | jq -r '.GOOGLE_CLIENT_SECRET')
+FRONTEND_URL=$(echo "$SECRETS" | jq -r '.FRONTEND_URL // "https://diet-management-app-tau.vercel.app"')
 GITHUB_TOKEN=$(echo "$SECRETS" | jq -r '.GITHUB_TOKEN')
 
 log "Secrets loaded successfully"
@@ -118,6 +119,7 @@ docker run -d \
   -e JWT_SECRET="$JWT_SECRET" \
   -e GOOGLE_CLIENT_ID="$GOOGLE_CLIENT_ID" \
   -e GOOGLE_CLIENT_SECRET="$GOOGLE_CLIENT_SECRET" \
+  -e FRONTEND_URL="$FRONTEND_URL" \
   -e NODE_ENV=production \
   ghcr.io/ayansasmal/diet-api:latest
 

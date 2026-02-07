@@ -550,6 +550,7 @@ deploy_to_ec2() {
    JWT_SECRET=\$(echo \$SECRETS | jq -r '.JWT_SECRET')
    GOOGLE_CLIENT_ID=\$(echo \$SECRETS | jq -r '.GOOGLE_CLIENT_ID')
    GOOGLE_CLIENT_SECRET=\$(echo \$SECRETS | jq -r '.GOOGLE_CLIENT_SECRET')
+   FRONTEND_URL=\$(echo \$SECRETS | jq -r '.FRONTEND_URL')
 
    docker run -d \\
      --name diet-api \\
@@ -564,6 +565,7 @@ deploy_to_ec2() {
      -e JWT_SECRET="\${JWT_SECRET}" \\
      -e GOOGLE_CLIENT_ID="\${GOOGLE_CLIENT_ID}" \\
      -e GOOGLE_CLIENT_SECRET="\${GOOGLE_CLIENT_SECRET}" \\
+     -e FRONTEND_URL="\${FRONTEND_URL}" \\
      -e NODE_ENV=production \\
      ghcr.io/ayansasmal/diet-api:latest
 
@@ -756,6 +758,10 @@ update_secrets() {
         GITHUB_TOKEN="CHANGE_ME"
     fi
 
+    # FRONTEND_URL - the Vercel frontend URL for OAuth redirect_uri matching
+    FRONTEND_URL="${FRONTEND_URL:-https://diet-management-app-tau.vercel.app}"
+    log_info "FRONTEND_URL: ${FRONTEND_URL}"
+
     # Build the secret JSON
     SECRET_JSON=$(cat <<EOF
 {
@@ -763,6 +769,7 @@ update_secrets() {
   "GOOGLE_CLIENT_ID": "${GOOGLE_CLIENT_ID:-CHANGE_ME}",
   "GOOGLE_CLIENT_SECRET": "${GOOGLE_CLIENT_SECRET:-CHANGE_ME}",
   "DATABASE_URL": "${DATABASE_URL}",
+  "FRONTEND_URL": "${FRONTEND_URL}",
   "GITHUB_TOKEN": "${GITHUB_TOKEN}"
 }
 EOF
@@ -798,6 +805,7 @@ EOF
     log_info "DATABASE_URL: postgresql://dietapp:****@${RDS_ENDPOINT}:5432/diet_management"
     log_info "JWT_SECRET: (generated)"
     log_info "GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-NOT SET}"
+    log_info "FRONTEND_URL: ${FRONTEND_URL}"
     log_warn "If GOOGLE credentials show 'NOT SET', update .env file and re-run"
 }
 
