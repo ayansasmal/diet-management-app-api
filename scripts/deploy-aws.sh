@@ -554,12 +554,14 @@ deploy_to_ec2() {
      --name diet-api \\
      --restart unless-stopped \\
      -p 3000:3000 \\
+     -v /opt/diet-app/certs:/app/certs:ro \\
      --log-driver=awslogs \\
      --log-opt awslogs-region=ap-southeast-2 \\
      --log-opt awslogs-group=/diet-app/api \\
      --log-opt awslogs-stream=diet-api \\
      --log-opt awslogs-create-group=true \\
      -e DATABASE_URL="\${DATABASE_URL}" \\
+     -e DATABASE_SSL_CA="/app/certs/global-bundle.pem" \\
      -e JWT_SECRET="\${JWT_SECRET}" \\
      -e GOOGLE_CLIENT_ID="\${GOOGLE_CLIENT_ID}" \\
      -e GOOGLE_CLIENT_SECRET="\${GOOGLE_CLIENT_SECRET}" \\

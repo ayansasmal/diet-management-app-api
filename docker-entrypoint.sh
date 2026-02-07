@@ -15,7 +15,16 @@ until node -e "
 const { PrismaClient } = require('@prisma/client');
 const { PrismaPg } = require('@prisma/adapter-pg');
 const connectionString = process.env.DATABASE_URL;
-const adapter = new PrismaPg({ connectionString });
+const fs = require('fs');
+const caPath = process.env.DATABASE_SSL_CA;
+if (process.env.NODE_ENV === 'production') {
+  if (!caPath) throw new Error('DATABASE_SSL_CA is required in production');
+  if (!fs.existsSync(caPath)) throw new Error('SSL CA cert not found at ' + caPath);
+}
+const ssl = process.env.NODE_ENV === 'production'
+  ? { rejectUnauthorized: true, ca: fs.readFileSync(caPath, 'utf-8') }
+  : undefined;
+const adapter = new PrismaPg({ connectionString, ssl });
 const prisma = new PrismaClient({ adapter });
 prisma.\$connect().then(() => {
   console.log('Database connected');
@@ -44,6 +53,16 @@ else
   echo "Running database migrations..."
   npx prisma migrate deploy 2>&1 || {
     echo "WARNING: Prisma migrate deploy failed, attempting to continue..."
+  }
+fi
+
+# Run database seed (idempotent - uses upsert to avoid duplicates)
+if [ "$SKIP_SEED" = "true" ]; then
+  echo "Skipping seed (SKIP_SEED=true)"
+else
+  echo "Running database seed..."
+  npx prisma db seed 2>&1 || {
+    echo "WARNING: Prisma db seed failed, attempting to continue..."
   }
 fi
 

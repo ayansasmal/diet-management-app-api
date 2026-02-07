@@ -55,6 +55,14 @@ curl -sL "https://github.com/caddyserver/caddy/releases/download/v${CADDY_VERSIO
 # Create app directory
 mkdir -p /opt/diet-app
 
+# Download AWS RDS CA bundle for SSL verification
+echo "[$(date)] Downloading RDS CA bundle..."
+mkdir -p /opt/diet-app/certs
+curl -sL "https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem" \
+  -o /opt/diet-app/certs/global-bundle.pem && \
+  echo "[$(date)] RDS CA bundle downloaded successfully" || \
+  echo "[$(date)] ERROR: RDS CA bundle download failed — app will not start without it!" && exit 1
+
 # Create the start script that pulls secrets and runs the container
 echo "[$(date)] Creating start script..."
 cat > /opt/diet-app/start.sh << 'SCRIPT'
@@ -109,13 +117,15 @@ log "Stopping existing container (if any)..."
 docker stop diet-api 2>/dev/null || true
 docker rm diet-api 2>/dev/null || true
 
-# Run the container
+# Run the container with RDS CA cert mounted
 log "Starting container..."
 docker run -d \
   --name diet-api \
   --restart unless-stopped \
   -p 3000:3000 \
+  -v /opt/diet-app/certs:/app/certs:ro \
   -e DATABASE_URL="$DATABASE_URL" \
+  -e DATABASE_SSL_CA="/app/certs/global-bundle.pem" \
   -e JWT_SECRET="$JWT_SECRET" \
   -e GOOGLE_CLIENT_ID="$GOOGLE_CLIENT_ID" \
   -e GOOGLE_CLIENT_SECRET="$GOOGLE_CLIENT_SECRET" \

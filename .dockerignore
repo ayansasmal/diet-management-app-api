@@ -46,8 +46,8 @@ k8s
 # Scripts (run from host)
 scripts
 
-# Prisma seed file (not needed in production)
-prisma/seed.ts
+# Note: prisma/seed.ts is no longer excluded — it runs during first deployment
+# to populate initial nutrition plans and roles
 
 # Temporary files
 tmp

@@ -22,10 +22,13 @@ services:
       - NODE_ENV=production
       - PORT=3000
       - DATABASE_URL=${DATABASE_URL}
+      - DATABASE_SSL_CA=/app/certs/global-bundle.pem
       - JWT_SECRET=${JWT_SECRET}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
       - FRONTEND_URL=${FRONTEND_URL:-https://diet-management-app-tau.vercel.app}
+    volumes:
+      - ${RDS_CERTS_DIR:-/opt/diet-app/certs}:/app/certs:ro
     # CloudWatch Logs configuration
     logging:
       driver: awslogs
@@ -39,10 +42,10 @@ services:
     # Health check
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health/live"]
-      interval: 30s
+      interval: 120s
       timeout: 10s
       retries: 3
-      start_period: 10s
+      start_period: 60s
     # Resource limits for t4g.micro (1GB RAM)
     deploy:
       resources:
