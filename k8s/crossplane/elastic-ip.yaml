@@ -16,23 +16,6 @@ spec:
       ManagedBy: crossplane
   providerConfigRef:
     name: aws-prod
----
-# Note: EIP Association requires the spot instance to be running
-# This should be applied after the spot instance is created
-# apiVersion: ec2.aws.upbound.io/v1beta1
-# kind: EIPAssociation
-# metadata:
-#   name: diet-app-eip-assoc
-#   labels:
-#     app: diet-management
-# spec:
-#   forProvider:
-#     region: ap-southeast-2
-#     allocationIdSelector:
-#       matchLabels:
-#         app: diet-management
-#     instanceIdSelector:
-#       matchLabels:
-#         app: diet-management
-#   providerConfigRef:
-#     name: aws-prod
+
+# Note: EIP Association is managed separately in eip-association.yaml
+# It is applied by deploy-aws.sh after the spot instance is confirmed running

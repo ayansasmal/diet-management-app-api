@@ -297,21 +297,9 @@ wait_for_rds() {
     return 1
 }
 
-# Associate Elastic IP with EC2 instance
+# Associate Elastic IP with EC2 instance via Crossplane EIPAssociation
 associate_elastic_ip() {
-    log_info "Associating Elastic IP with EC2 instance..."
-
-    # Get the Elastic IP allocation ID
-    local EIP_ALLOC_ID=$(aws ec2 describe-addresses \
-        --region ${AWS_REGION} \
-        --filters "Name=tag:Name,Values=diet-app-eip" \
-        --query 'Addresses[0].AllocationId' \
-        --output text 2>/dev/null)
-
-    if [ -z "${EIP_ALLOC_ID}" ] || [ "${EIP_ALLOC_ID}" = "None" ]; then
-        log_warn "Elastic IP not found. Skipping association."
-        return 1
-    fi
+    log_info "Associating Elastic IP with EC2 instance via Crossplane..."
 
     # Get the EC2 instance ID from active spot request
     local INSTANCE_ID=$(aws ec2 describe-spot-instance-requests \
@@ -325,18 +313,28 @@ associate_elastic_ip() {
         return 1
     fi
 
-    # Associate EIP with instance
-    aws ec2 associate-address \
-        --instance-id "${INSTANCE_ID}" \
-        --allocation-id "${EIP_ALLOC_ID}" \
-        --region ${AWS_REGION} > /dev/null
+    # Apply EIPAssociation manifest with instance ID substituted
+    sed "s/INSTANCE_ID/${INSTANCE_ID}/g" "${K8S_CROSSPLANE_DIR}/eip-association.yaml" \
+        | kubectl apply -f -
 
-    # Get the public IP
+    # Wait for Crossplane to reconcile the association
+    log_info "Waiting for EIP association to sync..."
+    local max_wait=10
+    for i in $(seq 1 ${max_wait}); do
+        local synced=$(kubectl get eipassociation diet-app-eip-assoc \
+            -o jsonpath='{.status.conditions[?(@.type=="Synced")].status}' 2>/dev/null)
+        if [ "${synced}" = "True" ]; then
+            break
+        fi
+        sleep 5
+    done
+
+    # Get the public IP from the EIP
     local PUBLIC_IP=$(aws ec2 describe-addresses \
-        --allocation-ids "${EIP_ALLOC_ID}" \
         --region ${AWS_REGION} \
+        --filters "Name=tag:Name,Values=diet-app-eip" \
         --query 'Addresses[0].PublicIp' \
-        --output text)
+        --output text 2>/dev/null)
 
     log_success "Elastic IP ${PUBLIC_IP} associated with instance ${INSTANCE_ID}"
     echo "${PUBLIC_IP}"
@@ -623,6 +621,10 @@ check_status() {
     kubectl get eip 2>/dev/null || echo "Not provisioned"
     echo ""
 
+    log_info "EIP Association:"
+    kubectl get eipassociation 2>/dev/null || echo "Not provisioned"
+    echo ""
+
     log_info "EC2 Spot Instance:"
     kubectl get spotinstancerequest,launchtemplate 2>/dev/null || echo "Not provisioned"
     echo ""
@@ -653,6 +655,7 @@ destroy_resources() {
     # Delete in reverse order of dependencies
     kubectl delete -f "${K8S_CROSSPLANE_DIR}/route53.yaml" --ignore-not-found
     kubectl delete -f "${K8S_CROSSPLANE_DIR}/cloudwatch.yaml" --ignore-not-found
+    kubectl delete eipassociation diet-app-eip-assoc --ignore-not-found 2>/dev/null || true
     kubectl delete -f "${K8S_CROSSPLANE_DIR}/spot-instance.yaml" --ignore-not-found
     kubectl delete -f "${K8S_CROSSPLANE_DIR}/elastic-ip.yaml" --ignore-not-found
     kubectl delete -f "${K8S_CROSSPLANE_DIR}/secrets.yaml" --ignore-not-found
@@ -925,8 +928,9 @@ update_stack() {
     if [ "${ec2_needs_rebuild}" = true ]; then
         log_info ">>> Rebuilding EC2 instance..."
 
-        # Delete existing EC2 resources
+        # Delete existing EC2 resources and EIP association
         log_info "Deleting existing EC2 resources..."
+        kubectl delete eipassociation diet-app-eip-assoc --ignore-not-found 2>/dev/null || true
         kubectl delete spotinstancerequest diet-app-spot --ignore-not-found --wait=true 2>/dev/null || true
         kubectl delete keypair diet-app-keypair --ignore-not-found 2>/dev/null || true
         kubectl delete instanceprofile diet-app-ec2-profile --ignore-not-found 2>/dev/null || true
@@ -988,6 +992,10 @@ case "${1:-status}" in
     deploy)
         deploy_to_ec2
         ;;
+    associate-eip)
+        check_prerequisites
+        associate_elastic_ip
+        ;;
     status)
         check_status
         ;;
@@ -998,10 +1006,11 @@ case "${1:-status}" in
         update_stack
         ;;
     *)
-        log_info "Usage: $0 {all|update|setup-creds|infra|update-secrets|ec2|deploy|status|destroy}"
+        log_info "Usage: $0 {all|update|setup-creds|infra|update-secrets|ec2|deploy|associate-eip|status|destroy}"
         log_info ""
-        log_info "Quick start:  $0 all     # Full automated deployment"
-        log_info "Update:       $0 update  # Detect changes and update stack"
+        log_info "Quick start:  $0 all           # Full automated deployment"
+        log_info "Update:       $0 update        # Detect changes and update stack"
+        log_info "EIP:          $0 associate-eip  # Re-associate Elastic IP with EC2"
         exit 1
         ;;
 esac
