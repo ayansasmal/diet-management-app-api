@@ -281,7 +281,7 @@ Before provisioning, update these files with your values:
 # - Security groups
 # - RDS PostgreSQL (takes 10-15 minutes)
 # - Spot EC2 instance
-# - Elastic IP
+# - Elastic IP + EIP Association
 # - S3 bucket
 # - Secrets Manager
 
@@ -528,7 +528,7 @@ ssh -L 5432:RDS_ENDPOINT:5432 -i ~/.ssh/diet-app-aws ec2-user@EC2_IP
 kubectl get managed
 
 # Check specific resources
-kubectl get vpc,subnet,securitygroup,instance.rds,bucket,eip
+kubectl get vpc,subnet,securitygroup,instance.rds,bucket,eip,eipassociation
 ```
 
 ---
@@ -584,6 +584,23 @@ sudo journalctl -u caddy -n 100
 # Force certificate renewal
 sudo caddy reload --config /etc/caddy/Caddyfile
 ```
+
+### Elastic IP Not Associated
+
+The EIP association is managed by Crossplane via `eip-association.yaml`. If the API is unreachable at the Elastic IP:
+
+```bash
+# Check EIP association status
+kubectl get eipassociation
+
+# Re-associate (uses Crossplane — finds the running spot instance automatically)
+./scripts/deploy-aws.sh associate-eip
+
+# Verify
+curl http://52.64.234.56:3000/api/health/live
+```
+
+**Note:** The `eip-association.yaml` is a template — the instance ID is substituted at apply time by `deploy-aws.sh`. Crossplane then manages the association declaratively (self-healing if disrupted).
 
 ### Crossplane Resource Stuck
 
@@ -650,6 +667,7 @@ aws ce get-cost-and-usage \
 ./scripts/deploy-aws.sh update-secrets # Update Secrets Manager with RDS endpoint
 ./scripts/deploy-aws.sh ec2            # Provision/rebuild EC2 only
 ./scripts/deploy-aws.sh deploy         # Deploy app to EC2 via SSH
+./scripts/deploy-aws.sh associate-eip  # Re-associate Elastic IP with current EC2 instance
 ./scripts/deploy-aws.sh status         # Check resource status
 ./scripts/deploy-aws.sh destroy        # DESTROY ALL (dangerous!)
 
@@ -658,9 +676,10 @@ aws ce get-cost-and-usage \
 ./scripts/build-push-ghcr.sh info   # Show image info
 
 # Crossplane Resources
-kubectl get managed                  # All managed resources
-kubectl get vpc,subnet,instance.rds  # Specific resources
-kubectl describe instance.rds diet-app-db  # Resource details
+kubectl get managed                           # All managed resources
+kubectl get vpc,subnet,instance.rds           # Specific resources
+kubectl get eip,eipassociation                # Elastic IP and association status
+kubectl describe instance.rds diet-app-db     # Resource details
 ```
 
 ### Important URLs
