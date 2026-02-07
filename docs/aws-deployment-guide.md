@@ -674,4 +674,97 @@ kubectl describe instance.rds diet-app-db  # Resource details
 
 ---
 
-*Last Updated: February 1, 2026*
+## Day-to-Day Deployment Workflow
+
+### Updating Backend Code (no infra changes)
+
+When you've made code changes to the backend and need to deploy:
+
+```bash
+cd backend
+
+# 1. Build and push new Docker image to GHCR
+./scripts/build-push-ghcr.sh all
+
+# 2. SSH into EC2 and restart with latest image
+EC2_IP=$(kubectl get eip diet-app-eip -o jsonpath='{.status.atProvider.publicIp}')
+ssh -i ~/.ssh/diet-app-aws ec2-user@${EC2_IP}
+
+# On EC2: restart the service (pulls latest image from GHCR)
+sudo systemctl restart diet-app
+
+# Or manually:
+/opt/diet-app/start.sh
+```
+
+### Updating Infrastructure (Crossplane manifests changed)
+
+When Crossplane YAML files in `k8s/crossplane/` have changed:
+
+```bash
+cd backend
+
+# Detect changes and apply (auto-rebuilds EC2 if user data changed)
+./scripts/deploy-aws.sh update
+```
+
+**Important:** If `spot-instance.yaml` changed (e.g., user data script), the EC2 instance is **terminated and recreated** (~5 min downtime).
+
+### Updating Secrets
+
+When adding/changing environment variables or credentials:
+
+```bash
+cd backend
+
+# Update AWS Secrets Manager with current values
+./scripts/deploy-aws.sh update-secrets
+
+# Then restart EC2 to pick up new secrets:
+# Option A: SSH in and restart
+EC2_IP=$(kubectl get eip diet-app-eip -o jsonpath='{.status.atProvider.publicIp}')
+ssh -i ~/.ssh/diet-app-aws ec2-user@${EC2_IP} "sudo systemctl restart diet-app"
+
+# Option B: Full rebuild (if user data also changed)
+./scripts/deploy-aws.sh update
+```
+
+### Environment Variables
+
+All secrets are stored in AWS Secrets Manager (`diet-app/production/secrets`). The EC2 start script reads them at container startup.
+
+| Variable | Purpose | Where Set |
+|----------|---------|-----------|
+| `DATABASE_URL` | PostgreSQL connection | Auto-generated from RDS endpoint |
+| `JWT_SECRET` | Token signing | Auto-generated |
+| `GOOGLE_CLIENT_ID` | OAuth client | From `.env` or `.env.prod` |
+| `GOOGLE_CLIENT_SECRET` | OAuth secret | From `.env` or `.env.prod` |
+| `FRONTEND_URL` | Vercel frontend URL (for OAuth redirect_uri) | Default: `https://diet-management-app-tau.vercel.app` |
+| `GITHUB_TOKEN` | GHCR access | From environment |
+
+### Frontend Deployment (Vercel)
+
+The frontend auto-deploys on push to the `prod` branch via GitHub integration:
+
+```bash
+cd frontend
+git push origin prod   # Triggers Vercel auto-deploy
+```
+
+**Frontend env vars** are set in Vercel project settings:
+- `NEXT_PUBLIC_API_URL` - Backend proxy URL
+- `NEXT_PUBLIC_GOOGLE_CLIENT_ID` - OAuth client ID
+- `NEXT_PUBLIC_APP_URL` - Frontend URL (for OAuth redirect)
+- `BACKEND_API_URL` - Backend URL (used by Next.js API proxy route)
+
+### Full Stack Deploy Checklist
+
+1. Push backend changes → `./scripts/build-push-ghcr.sh all`
+2. Update secrets if needed → `./scripts/deploy-aws.sh update-secrets`
+3. Restart EC2 → SSH + `sudo systemctl restart diet-app`
+4. Push frontend changes → `git push origin prod` (auto-deploys to Vercel)
+5. Verify → `curl http://<EC2_IP>:3000/api/health/live`
+
+---
+
+*Last Updated: February 7, 2026*
