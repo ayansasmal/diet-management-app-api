@@ -99,7 +99,6 @@ metadata:
     app: diet-management
 spec:
   forProvider:
-    name: diet-app-s3-deploy-read
     policy: |
       {
         "Version": "2012-10-17",
