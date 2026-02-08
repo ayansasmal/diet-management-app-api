@@ -30,6 +30,8 @@
 #   update-secrets  - Update AWS Secrets Manager with RDS endpoint
 #   ec2             - Provision EC2 spot instance (after secrets ready)
 #   deploy          - Show manual deployment steps for EC2
+#   upload-scripts  - Upload deploy scripts to S3 (ec2-setup.sh, start.sh)
+#   restart-app     - Restart diet-app service on EC2 via SSM
 #   status          - Check AWS resource status
 #   destroy         - Destroy all AWS resources (DANGEROUS)
 # =============================================================================
@@ -47,7 +49,9 @@ NC='\033[0m' # No Color
 CROSSPLANE_NAMESPACE="crossplane-system"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 K8S_CROSSPLANE_DIR="${SCRIPT_DIR}/../k8s/crossplane"
+DEPLOY_SCRIPTS_DIR="${SCRIPT_DIR}/deploy"
 AWS_REGION="ap-southeast-2"
+DEPLOY_BUCKET="diet-app-uploads-851112554948"
 
 # Helper functions with timestamps
 timestamp() { date '+%Y-%m-%d %H:%M:%S'; }
@@ -385,6 +389,87 @@ wait_for_ec2() {
     return 1
 }
 
+# Upload deploy scripts to S3
+upload_scripts() {
+    log_info "Uploading deploy scripts to S3..."
+
+    if [ ! -d "${DEPLOY_SCRIPTS_DIR}" ]; then
+        log_error "Deploy scripts directory not found: ${DEPLOY_SCRIPTS_DIR}"
+        exit 1
+    fi
+
+    aws s3 cp "${DEPLOY_SCRIPTS_DIR}/" "s3://${DEPLOY_BUCKET}/deploy/" \
+        --recursive \
+        --region "${AWS_REGION}" \
+        --exclude "*.bak" \
+        --exclude ".DS_Store"
+
+    log_success "Deploy scripts uploaded to s3://${DEPLOY_BUCKET}/deploy/"
+
+    # Show uploaded files
+    aws s3 ls "s3://${DEPLOY_BUCKET}/deploy/" --region "${AWS_REGION}"
+}
+
+# Restart diet-app service on EC2 via SSM (downloads latest start.sh from S3)
+restart_app() {
+    log_info "Restarting diet-app service on EC2 via SSM..."
+
+    # Get the EC2 instance ID
+    local INSTANCE_ID=$(aws ec2 describe-spot-instance-requests \
+        --region ${AWS_REGION} \
+        --filters "Name=tag:Name,Values=diet-app-spot" "Name=state,Values=active" \
+        --query 'SpotInstanceRequests[0].InstanceId' \
+        --output text 2>/dev/null)
+
+    if [ -z "${INSTANCE_ID}" ] || [ "${INSTANCE_ID}" = "None" ]; then
+        log_error "EC2 instance not found. Is the spot instance running?"
+        exit 1
+    fi
+
+    log_info "Sending restart command to instance ${INSTANCE_ID}..."
+
+    # Use SSM to restart the service (systemd ExecStartPre re-downloads start.sh from S3)
+    local COMMAND_ID=$(aws ssm send-command \
+        --instance-ids "${INSTANCE_ID}" \
+        --document-name "AWS-RunShellScript" \
+        --parameters 'commands=["systemctl restart diet-app"]' \
+        --region "${AWS_REGION}" \
+        --query 'Command.CommandId' \
+        --output text)
+
+    log_info "SSM command sent: ${COMMAND_ID}"
+
+    # Wait for command to complete
+    local max_wait=12
+    for i in $(seq 1 ${max_wait}); do
+        local status=$(aws ssm get-command-invocation \
+            --command-id "${COMMAND_ID}" \
+            --instance-id "${INSTANCE_ID}" \
+            --region "${AWS_REGION}" \
+            --query 'Status' \
+            --output text 2>/dev/null || echo "Pending")
+
+        if [ "${status}" = "Success" ]; then
+            log_success "Service restarted successfully on ${INSTANCE_ID}"
+            return 0
+        elif [ "${status}" = "Failed" ] || [ "${status}" = "TimedOut" ] || [ "${status}" = "Cancelled" ]; then
+            log_error "SSM command ${status}. Check CloudWatch logs."
+            aws ssm get-command-invocation \
+                --command-id "${COMMAND_ID}" \
+                --instance-id "${INSTANCE_ID}" \
+                --region "${AWS_REGION}" \
+                --query '{Status:Status,Output:StandardOutputContent,Error:StandardErrorContent}' \
+                --output table 2>/dev/null || true
+            return 1
+        fi
+
+        log_info "Command status: ${status} (waiting 10s...)"
+        sleep 10
+    done
+
+    log_warn "Command still running. Check with: aws ssm get-command-invocation --command-id ${COMMAND_ID} --instance-id ${INSTANCE_ID} --region ${AWS_REGION}"
+}
+
 # Full automated deployment
 provision_all() {
     check_prerequisites
@@ -416,20 +501,24 @@ provision_all() {
     log_info ">>> Phase 4: Updating secrets with RDS endpoint..."
     update_secrets
 
-    # Phase 5: Provision compute
-    log_info ">>> Phase 5: Provisioning EC2 and Elastic IP..."
+    # Phase 5: Upload deploy scripts to S3
+    log_info ">>> Phase 5: Uploading deploy scripts to S3..."
+    upload_scripts
+
+    # Phase 6: Provision compute
+    log_info ">>> Phase 6: Provisioning EC2 and Elastic IP..."
     provision_secrets
     provision_elastic_ip
     provision_ec2 auto  # Skip SSH key prompt in automated mode
 
-    # Phase 6: Wait for EC2
-    log_info ">>> Phase 6: Waiting for EC2..."
+    # Phase 7: Wait for EC2
+    log_info ">>> Phase 7: Waiting for EC2..."
     if ! wait_for_ec2; then
         log_warn "EC2 may still be starting. Check with './scripts/deploy-aws.sh status'"
     fi
 
-    # Phase 7: Associate Elastic IP
-    log_info ">>> Phase 7: Associating Elastic IP..."
+    # Phase 8: Associate Elastic IP
+    log_info ">>> Phase 8: Associating Elastic IP..."
     ELASTIC_IP=$(associate_elastic_ip)
 
     echo ""
@@ -853,6 +942,7 @@ update_stack() {
 
     local changes_detected=false
     local ec2_needs_rebuild=false
+    local scripts_changed=false
 
     # List of manifests to check
     declare -a MANIFESTS=(
@@ -891,11 +981,39 @@ update_stack() {
         fi
     done
 
+    # Check deploy scripts for changes (S3 upload only, no EC2 rebuild)
+    for script in ec2-setup.sh start.sh; do
+        local script_path="${DEPLOY_SCRIPTS_DIR}/${script}"
+        if [ -f "${script_path}" ]; then
+            local current_checksum=$(get_checksum "${script_path}")
+            local stored_checksum=$(get_stored_checksum "deploy/${script}")
+            if [ "${current_checksum}" != "${stored_checksum}" ]; then
+                changes_detected=true
+                scripts_changed=true
+                log_info "Deploy script changed: ${script}"
+            else
+                log_info "No change: deploy/${script}"
+            fi
+        fi
+    done
+
     echo ""
 
     if [ "${changes_detected}" = false ]; then
         log_success "No changes detected. Stack is up to date."
         return 0
+    fi
+
+    # Upload deploy scripts if changed
+    if [ "${scripts_changed}" = true ]; then
+        log_info ">>> Uploading deploy scripts to S3..."
+        upload_scripts
+        for script in ec2-setup.sh start.sh; do
+            local script_path="${DEPLOY_SCRIPTS_DIR}/${script}"
+            if [ -f "${script_path}" ]; then
+                store_checksum "deploy/${script}" "$(get_checksum "${script_path}")"
+            fi
+        done
     fi
 
     log_info "Applying changes..."
@@ -939,6 +1057,8 @@ update_stack() {
         kubectl delete role diet-app-ec2-role --ignore-not-found 2>/dev/null || true
         kubectl delete rolepolicyattachment diet-app-ssm-policy --ignore-not-found 2>/dev/null || true
         kubectl delete rolepolicyattachment diet-app-cloudwatch-policy --ignore-not-found 2>/dev/null || true
+        kubectl delete rolepolicyattachment diet-app-s3-deploy-policy --ignore-not-found 2>/dev/null || true
+        kubectl delete policy.iam diet-app-s3-deploy-read --ignore-not-found 2>/dev/null || true
 
         log_info "Waiting for EC2 termination..."
         sleep 45
@@ -961,6 +1081,12 @@ update_stack() {
         # Just apply (no rebuild needed)
         kubectl apply -f "${K8S_CROSSPLANE_DIR}/spot-instance.yaml"
         store_checksum "spot-instance.yaml" "$(get_checksum "${K8S_CROSSPLANE_DIR}/spot-instance.yaml")"
+    fi
+
+    # If only deploy scripts changed (no EC2 rebuild), restart the service
+    if [ "${scripts_changed}" = true ] && [ "${ec2_needs_rebuild}" = false ]; then
+        log_info ">>> Deploy scripts updated — restarting app via SSM..."
+        restart_app || log_warn "SSM restart failed. SSH in and run: systemctl restart diet-app"
     fi
 
     echo ""
@@ -998,6 +1124,14 @@ case "${1:-status}" in
         check_prerequisites
         associate_elastic_ip
         ;;
+    upload-scripts)
+        check_prerequisites
+        upload_scripts
+        ;;
+    restart-app)
+        check_prerequisites
+        restart_app
+        ;;
     status)
         check_status
         ;;
@@ -1008,11 +1142,13 @@ case "${1:-status}" in
         update_stack
         ;;
     *)
-        log_info "Usage: $0 {all|update|setup-creds|infra|update-secrets|ec2|deploy|associate-eip|status|destroy}"
+        log_info "Usage: $0 {all|update|setup-creds|infra|update-secrets|ec2|deploy|associate-eip|upload-scripts|restart-app|status|destroy}"
         log_info ""
-        log_info "Quick start:  $0 all           # Full automated deployment"
-        log_info "Update:       $0 update        # Detect changes and update stack"
-        log_info "EIP:          $0 associate-eip  # Re-associate Elastic IP with EC2"
+        log_info "Quick start:    $0 all             # Full automated deployment"
+        log_info "Update:         $0 update          # Detect changes and update stack"
+        log_info "Upload scripts: $0 upload-scripts  # Upload deploy scripts to S3"
+        log_info "Restart app:    $0 restart-app     # Restart app on EC2 via SSM"
+        log_info "EIP:            $0 associate-eip   # Re-associate Elastic IP with EC2"
         exit 1
         ;;
 esac

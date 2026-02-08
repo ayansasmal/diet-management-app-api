@@ -37,9 +37,12 @@ npm run test:api:report        # Tests with HTML reports
 ./scripts/deploy-local.sh clean   # Tear down local env
 
 # Deployment (AWS via Crossplane)
-./scripts/deploy-aws.sh setup-creds  # Configure AWS credentials
-./scripts/deploy-aws.sh infra        # Provision AWS resources
-./scripts/deploy-aws.sh status       # Check AWS resources
+./scripts/deploy-aws.sh setup-creds    # Configure AWS credentials
+./scripts/deploy-aws.sh infra          # Provision AWS resources
+./scripts/deploy-aws.sh update         # Detect changes and apply
+./scripts/deploy-aws.sh upload-scripts # Upload deploy scripts to S3
+./scripts/deploy-aws.sh restart-app    # Restart app on EC2 via SSM
+./scripts/deploy-aws.sh status         # Check AWS resources
 
 # Docker Image (GitHub Container Registry)
 ./scripts/build-push-ghcr.sh all    # Build ARM64 and push to GHCR
@@ -164,6 +167,22 @@ k8s/
 ## Related Repository
 
 - [Frontend UI](https://github.com/ayansasmal/diet-management-app-ui)
+
+## S3 Bootstrap Pattern
+
+EC2 setup uses an S3 bootstrap pattern to avoid EC2 rebuilds for script changes:
+
+```
+scripts/ec2-userdata.sh     → Tiny bootstrap (base64 in spot-instance.yaml)
+scripts/deploy/ec2-setup.sh → Infrastructure setup (uploaded to S3)
+scripts/deploy/start.sh     → App start script (uploaded to S3, re-downloaded on every restart)
+```
+
+| What changed | Action | EC2 rebuild? |
+|---|---|---|
+| `start.sh` (env var, Docker flags) | `upload-scripts` + `restart-app` | No |
+| `ec2-setup.sh` (Docker, packages) | `upload-scripts` + EC2 rebuild | Yes |
+| EC2 config (AMI, instance type) | Edit `spot-instance.yaml` + rebuild | Yes |
 
 ## Debugging Tips
 
