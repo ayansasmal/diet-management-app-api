@@ -59,9 +59,12 @@ mkdir -p /opt/diet-app
 echo "[$(date)] Downloading RDS CA bundle..."
 mkdir -p /opt/diet-app/certs
 curl -sL "https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem" \
-  -o /opt/diet-app/certs/global-bundle.pem && \
-  echo "[$(date)] RDS CA bundle downloaded successfully" || \
-  echo "[$(date)] ERROR: RDS CA bundle download failed — app will not start without it!" && exit 1
+  -o /opt/diet-app/certs/global-bundle.pem
+if [ ! -s /opt/diet-app/certs/global-bundle.pem ]; then
+  echo "[$(date)] ERROR: RDS CA bundle download failed — app will not start without it!"
+  exit 1
+fi
+echo "[$(date)] RDS CA bundle downloaded successfully"
 
 # Create the start script that pulls secrets and runs the container
 echo "[$(date)] Creating start script..."
