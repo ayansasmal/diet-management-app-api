@@ -219,15 +219,15 @@ flowchart LR
 
 ---
 
-## 📁 Documentation Suite
+## Documentation Suite
 
 | Document | Purpose |
 |----------|---------|
-| [BUSINESS_REQUIREMENTS.md](./BUSINESS_REQUIREMENTS.md) | Full BRD with personas, features, roadmap |
 | [NUTRITION_PLAN_ENGINE.md](./NUTRITION_PLAN_ENGINE.md) | Plan schema, rule engine, implementation guide |
-| [ARCHITECTURE.md](./ARCHITECTURE.md) | System diagrams, data flows, ERD |
 | [SECURITY_DOCUMENTATION.md](./SECURITY_DOCUMENTATION.md) | Security controls, compliance |
-| [DELIVERY_PLAN.md](./DELIVERY_PLAN.md) | Implementation timeline |
+| [aws-deployment-guide.md](./aws-deployment-guide.md) | AWS deployment with Crossplane |
+| [GOOGLE_AUTH.md](./GOOGLE_AUTH.md) | Google OAuth setup |
+| [POSTMAN_NEWMAN_GUIDE.md](./POSTMAN_NEWMAN_GUIDE.md) | API testing guide |
 
 ---
 
